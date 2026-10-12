@@ -70,7 +70,8 @@ public final class ModelTextures
         return texture;
     }
 
-    private static Identifier idFor(String name)
+    /** Predictable identifier for a name registered through {@link #register}; used by world render types. */
+    public static Identifier idFor(String name)
     {
         return ArchfiendClient.id("dynamic/" + name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9/._-]", "_"));
     }

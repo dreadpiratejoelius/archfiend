@@ -1,15 +1,18 @@
 package dev.archfiend.sequence;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.archfiend.drop.RngDrop;
 import dev.archfiend.util.Draw;
 import dev.archfiend.util.Easing;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -65,6 +68,31 @@ public abstract class DropSequence
     /** Virtual Y coordinate (centre of the line) for the "where it landed" badge shown on reveal. */
     protected abstract float badgeY();
 
+    /** Whether this style draws a dark full-screen scrim behind the machine. World styles override to false. */
+    protected boolean rendersScrim()
+    {
+        return true;
+    }
+
+    /** Whether this is a world-space style (a 3D object in the world, HUD text only). */
+    protected boolean worldChest()
+    {
+        return false;
+    }
+
+    /** Whether only the chat overlay should be hidden (world styles hide chat but keep the rest of the HUD). */
+    protected boolean hidesChat()
+    {
+        return hidesHud();
+    }
+
+    /**
+     * Renders this sequence's world-space content into the level submit pass. GUI styles do nothing.
+     *
+     * @param cameraPos the camera position, for billboard orientation and distance
+     */
+    public void renderWorld(PoseStack poseStack, SubmitNodeCollector collector, Vec3 cameraPos, float partialTick) {}
+
     public final void tick()
     {
         if (isFinished()) return;
@@ -112,7 +140,13 @@ public abstract class DropSequence
     }
 
     /** Whether the vanilla HUD should stay hidden; it returns halfway through the final fade-out. */
-    public final boolean hidesHud()
+    public boolean hidesHud()
+    {
+        return spinning();
+    }
+
+    /** True while the sequence is still running (before the final fade-out). */
+    protected final boolean spinning()
     {
         return age < totalTicks - FADE_OUT_TICKS / 2;
     }
@@ -126,6 +160,12 @@ public abstract class DropSequence
     protected final int spinTicks()
     {
         return spinTicks;
+    }
+
+    /** Elapsed sequence time in seconds, clamped to the total length; for interpolation on render. */
+    protected final float timeSeconds(float partialTick)
+    {
+        return Math.min(age + partialTick, totalTicks) / 20f;
     }
 
     private void reveal()
@@ -146,7 +186,7 @@ public abstract class DropSequence
         int height = g.guiHeight();
 
         g.nextStratum();
-        g.fill(0, 0, width, height, Draw.argb(alpha * 0.6f, 0x000000));
+        if (rendersScrim()) g.fill(0, 0, width, height, Draw.argb(alpha * 0.6f, 0x000000));
         g.nextStratum();
 
         float layoutScale = ctx.scale() * Mth.clamp(
@@ -170,7 +210,7 @@ public abstract class DropSequence
 
         g.pose().popMatrix();
 
-        if (drop.tier().isJackpot() && time >= spinTicks && time < spinTicks + FLASH_TICKS)
+        if (drop.tier().isJackpot() && rendersScrim() && time >= spinTicks && time < spinTicks + FLASH_TICKS)
         {
             g.nextStratum();
             g.fill(0, 0, width, height, Draw.argb(0.35f * (1f - (time - spinTicks) / FLASH_TICKS), 0xFFFFFF));

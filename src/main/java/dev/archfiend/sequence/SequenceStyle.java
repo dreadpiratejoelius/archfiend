@@ -13,7 +13,10 @@ public enum SequenceStyle
     /** Three-reel slot machine with a lever (SkyOcean style). */
     SLOTS(SlotMachineSequence::new),
     /** 3D treasure chest that drops in, bursts open and reveals the item. Falls back to the reel if its models fail to load. */
-    CHEST(ctx -> ChestAssets.get().<DropSequence>map(assets -> new ChestSequence(ctx, assets)).orElseGet(() -> new ReelSequence(ctx)));
+    CHEST(ctx -> ChestAssets.get().<DropSequence>map(assets -> new ChestSequence(ctx, assets)).orElseGet(() -> new ReelSequence(ctx))),
+    /** The chest as a real 3D object simulated in the world. Falls back to the GUI chest if there is no valid spawn. */
+    WORLD_CHEST(ctx -> ChestAssets.get().<DropSequence>map(assets -> WorldChestSequence.tryCreate(ctx, assets)
+        .orElseGet(() -> new ChestSequence(ctx, assets))).orElseGet(() -> new ReelSequence(ctx)));
 
     private final Function<SequenceContext, DropSequence> factory;
 

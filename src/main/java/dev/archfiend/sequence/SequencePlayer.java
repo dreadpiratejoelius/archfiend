@@ -13,13 +13,16 @@ import dev.archfiend.repo.NeuRepo;
 import dev.archfiend.repo.NeuRepoManager;
 import dev.archfiend.track.DropRecord;
 import dev.archfiend.track.DropTracker;
+import dev.archfiend.track.EnemyDeathTracker;
 import dev.archfiend.track.ItemGain;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -51,6 +54,7 @@ public final class SequencePlayer
     private final ConfigManager configManager;
     private final NeuRepoManager repoManager;
     private final DropTracker tracker;
+    private final @Nullable EnemyDeathTracker deathTracker;
     private final Deque<QueuedDrop> queue = new ArrayDeque<>();
     /** Real item stacks seen arriving for drops still waiting in the queue. */
     private final Map<DropRecord, ItemStack> arrivedIcons = new IdentityHashMap<>();
@@ -66,14 +70,21 @@ public final class SequencePlayer
      *
      * @param withheld its chat message was suppressed and must be re-sent on reveal
      * @param record   its persisted record, or {@code null} for previews that must not count as drops
+     * @param deathPos world position where the enemy died, or {@code null} if unknown
      */
-    private record QueuedDrop(RngDrop drop, boolean withheld, @Nullable DropRecord record) {}
+    private record QueuedDrop(RngDrop drop, boolean withheld, @Nullable DropRecord record, @Nullable Vec3 deathPos) {}
 
     public SequencePlayer(ConfigManager configManager, NeuRepoManager repoManager, DropTracker tracker)
+    {
+        this(configManager, repoManager, tracker, null);
+    }
+
+    public SequencePlayer(ConfigManager configManager, NeuRepoManager repoManager, DropTracker tracker, @Nullable EnemyDeathTracker deathTracker)
     {
         this.configManager = configManager;
         this.repoManager = repoManager;
         this.tracker = tracker;
+        this.deathTracker = deathTracker;
         tracker.onConfirmed(this::onConfirmed);
         reloadParser();
     }
@@ -106,24 +117,25 @@ public final class SequencePlayer
 
         if (!drop.tier().isAtLeast(config.minTier)) return true;
         boolean withhold = config.delayChatMessage;
-        if (!enqueue(drop, withhold, record)) return true;
+        Vec3 deathPos = deathTracker != null ? deathTracker.findRecentDeath(System.currentTimeMillis()) : null;
+        if (!enqueue(drop, withhold, record, deathPos)) return true;
         return !withhold;
     }
 
     /** Queues a preview that is not recorded as a real drop. */
     public boolean enqueuePreview(RngDrop drop)
     {
-        return enqueue(drop, true, null);
+        return enqueue(drop, true, null, null);
     }
 
-    private boolean enqueue(RngDrop drop, boolean withheld, @Nullable DropRecord record)
+    private boolean enqueue(RngDrop drop, boolean withheld, @Nullable DropRecord record, @Nullable Vec3 deathPos)
     {
         if (queue.size() >= MAX_QUEUED)
         {
             ArchfiendClient.LOGGER.debug("Sequence queue full, letting '{}' through", drop.itemName());
             return false;
         }
-        queue.addLast(new QueuedDrop(drop, withheld, record));
+        queue.addLast(new QueuedDrop(drop, withheld, record, deathPos));
         return true;
     }
 
@@ -156,6 +168,12 @@ public final class SequencePlayer
         return current != null && configManager.get().hideHud && current.hidesHud();
     }
 
+    /** Whether only the chat overlay should be hidden (world styles hide chat but keep the rest of the HUD). */
+    public boolean hidesChat()
+    {
+        return current != null && current.hidesChat() && (configManager.get().hideHud || current.worldChest());
+    }
+
     public int queuedCount()
     {
         return queue.size();
@@ -173,12 +191,25 @@ public final class SequencePlayer
         {
             if (pending.withheld()) sendToChat(pending.drop().message());
         }
+        if (deathTracker != null) deathTracker.reset();
     }
 
     public void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker)
     {
         if (current == null) return;
         current.render(graphics, deltaTracker.getGameTimeDeltaPartialTick(true));
+    }
+
+    /** Renders the active sequence's world-space content into the level submit pass. */
+    public void renderWorld(LevelRenderContext context)
+    {
+        if (current == null) return;
+        current.renderWorld(
+            context.poseStack(),
+            context.submitNodeCollector(),
+            context.levelState().cameraRenderState.pos,
+            Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true)
+        );
     }
 
     private void start(Minecraft minecraft, QueuedDrop queued)
@@ -214,6 +245,7 @@ public final class SequencePlayer
             config.revealTicks,
             config.scale,
             config.nearMiss,
+            queued.deathPos(),
             this::releaseCurrent
         );
 

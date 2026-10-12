@@ -8,10 +8,11 @@ When a drop like `CRAZY RARE DROP!` or `PET DROP!` appears in chat, the drop mes
 
 ## Features
 
-- **Three styles**
+- **Four styles**
   - `reel`: a horizontal case-opening strip that slows down onto the drop (inspired by [Scatha-Pro](https://github.com/NamelessJu/Scatha-Pro))
   - `slots`: a 3-reel slot machine with a lever and staggered stops (inspired by [SkyOcean](https://github.com/meowdding/SkyOcean))
   - `chest`: a 3D treasure chest drops in with physics (bounces, wobble, squash and stretch), rattles, then bursts open on a hyperbolic-tangent curve with an exaggerated overshoot. A spinning, glowing question mark floats out, cycling through random rarity colours before slowly settling on the drop's real rarity colour and turning into the item.
+  - `world_chest`: the same chest as a real 3D object in the world — it drops from the sky in front of you, tumbles and collides with the blocks using client-side rigid-body physics (landing at any tilt), then rattles, bursts open, and the glowing question mark and item appear in the world above it. Falls back to `chest` when there is no valid spot in front of you.
 - **Real SkyBlock items:** icons and loot tables come from the [NotEnoughUpdates item repo](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO): textured heads, dyed leather, enchant glint, and Hypixel's own models when their resource pack is loaded.
 - **Real loot tables:** the reels are filled with what the dropping mob can actually drop, weighted by drop chance. For example, a Warden Heart rolls through Revenant Horror V's 16 drops.
 - **Near misses:** the rarest other drop sits right after the winning slot.
@@ -44,7 +45,7 @@ Open the settings menu with `/archfiend config`, the **Open Archfiend Settings**
 | `/archfiend history [n]` | Your last *n* drops with Magic Find and where they landed |
 | `/archfiend log` | Recent item arrivals and how each drop was matched (troubleshooting) |
 | `/archfiend test [tier] [item]` | Preview, e.g. `/archfiend test crazy_rare Warden Heart` |
-| `/archfiend style <reel\|slots\|chest>` | Switch style |
+| `/archfiend style <reel\|slots\|chest\|world_chest>` | Switch style |
 | `/archfiend mintier <tier>` | Lowest tier that triggers a spin (default `crazy_rare`) |
 | `/archfiend spin <ticks>` / `scale <x>` / `volume <x>` | Tuning |
 | `/archfiend toggle` / `chatdelay` / `skip` | Enable/disable, hold back the drop message, skip the current spin |

@@ -32,20 +32,26 @@ public final class ChestAssets
     public final float hingeY;
     public final float hingeZ;
     public final DynamicTexture chestTexture;
+    /** Texture-manager identifier of {@link #chestTexture}, for world render types. */
+    public final Identifier chestTextureId;
     public final Mesh question;
     public final DynamicTexture questionTexture;
+    /** Texture-manager identifier of the white tint texture, for world render types. */
+    public final Identifier whiteTextureId;
     public final Identifier glow;
 
-    private ChestAssets(Mesh chest, int lidPart, float hingeY, float hingeZ, DynamicTexture chestTexture,
-                        Mesh question, DynamicTexture questionTexture, Identifier glow)
+    private ChestAssets(Mesh chest, int lidPart, float hingeY, float hingeZ, DynamicTexture chestTexture, Identifier chestTextureId,
+                        Mesh question, DynamicTexture questionTexture, Identifier whiteTextureId, Identifier glow)
     {
         this.chest = chest;
         this.lidPart = lidPart;
         this.hingeY = hingeY;
         this.hingeZ = hingeZ;
         this.chestTexture = chestTexture;
+        this.chestTextureId = chestTextureId;
         this.question = question;
         this.questionTexture = questionTexture;
+        this.whiteTextureId = whiteTextureId;
         this.glow = glow;
     }
 
@@ -106,9 +112,11 @@ public final class ChestAssets
         return new ChestAssets(
             chest, lid, hingeY, hingeZ,
             ModelTextures.load(minecraft, chestModel.texture()),
+            ModelTextures.idFor("model/" + chestModel.texture().getPath()),
             question,
             // Drawn white and tinted with the glow, so it can cycle through every rarity colour.
             ModelTextures.white(minecraft),
+            ModelTextures.idFor("generated/white"),
             ModelTextures.radialGlow(minecraft, GLOW_SIZE)
         );
     }

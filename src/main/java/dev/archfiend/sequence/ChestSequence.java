@@ -310,7 +310,7 @@ final class ChestSequence extends DropSequence
         g.pose().pushMatrix();
         g.pose().translate(0f, y);
         MeshRenderer.draw(g, assets.question, assets.questionTexture, part -> transform,
-            CAMERA_DISTANCE, FOCAL, tint, alpha, 0.65f, false);
+            CAMERA_DISTANCE, FOCAL, tint, alpha, 0.65f, true);
         g.pose().popMatrix();
     }
 

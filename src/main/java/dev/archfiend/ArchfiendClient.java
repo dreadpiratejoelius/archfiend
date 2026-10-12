@@ -9,6 +9,7 @@ import dev.archfiend.repo.NeuRepoManager;
 import dev.archfiend.sequence.SequencePlayer;
 import dev.archfiend.track.DropLog;
 import dev.archfiend.track.DropTracker;
+import dev.archfiend.track.EnemyDeathTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -18,6 +19,7 @@ import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.screens.Screen;
@@ -50,6 +52,7 @@ public final class ArchfiendClient implements ClientModInitializer
     private NeuRepoManager repoManager;
     private SequencePlayer player;
     private DropLog dropLog;
+    private EnemyDeathTracker deathTracker;
     /** Set by commands; opened on the next tick because the closing chat screen would replace it. */
     private boolean settingsRequested;
 
@@ -69,12 +72,15 @@ public final class ArchfiendClient implements ClientModInitializer
         );
         repoManager.refreshAsync(false);
 
+        deathTracker = new EnemyDeathTracker();
+        deathTracker.registerEvents();
+
         dropLog = new DropLog(dataDir.resolve("drops.json"));
         dropLog.load();
         DropTracker tracker = new DropTracker(dropLog, record -> record.tier != DropTier.PET
             && (record.skyblockId == null || repoManager.repo().map(repo -> repo.canGoInSack(record.skyblockId)).orElse(true)));
 
-        player = new SequencePlayer(configManager, repoManager, tracker);
+        player = new SequencePlayer(configManager, repoManager, tracker, deathTracker);
         ArchfiendCommand command = new ArchfiendCommand(configManager, player, repoManager, tracker, () -> settingsRequested = true);
 
         KeyMapping.Category category = KeyMapping.Category.register(id(MOD_ID));
@@ -91,12 +97,14 @@ public final class ArchfiendClient implements ClientModInitializer
                 settingsRequested = false;
                 minecraft.gui.setScreen(createSettingsScreen(null));
             }
+            deathTracker.tick(minecraft);
             tracker.tick(minecraft);
             player.tick(minecraft);
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, minecraft) -> {
             player.reset();
             tracker.reset();
+            deathTracker.reset();
         });
         ClientLifecycleEvents.CLIENT_STOPPING.register(minecraft -> {
             repoManager.close();
@@ -107,6 +115,9 @@ public final class ArchfiendClient implements ClientModInitializer
         // Above chat and the player list so the reveal is never covered.
         HudElementRegistry.attachElementAfter(VanillaHudElements.SUBTITLES, id("drop_sequence"), player::render);
         hideVanillaHudDuringSequences();
+
+        // World-space content (the WORLD_CHEST style) is drawn into the level submit pass.
+        LevelRenderEvents.COLLECT_SUBMITS.register(player::renderWorld);
 
         LOGGER.info("Archfiend loaded");
     }
@@ -130,13 +141,22 @@ public final class ArchfiendClient implements ClientModInitializer
         return mod != null && mod.player != null && mod.player.hidesHud();
     }
 
+    /** True while a sequence should hide only the chat overlay (world styles). */
+    public static boolean chatHidden()
+    {
+        ArchfiendClient mod = instance;
+        return mod != null && mod.player != null && mod.player.hidesChat();
+    }
+
     /** Wraps every vanilla HUD element so it is skipped while a sequence plays. Our own element is untouched. */
     private static void hideVanillaHudDuringSequences()
     {
         for (Identifier element : VANILLA_HUD)
         {
+            // Chat is also hidden by world styles while the rest of the HUD stays visible.
+            boolean chat = element.equals(VanillaHudElements.CHAT);
             HudElementRegistry.replaceElement(element, original -> (graphics, deltaTracker) -> {
-                if (!hudHidden()) original.extractRenderState(graphics, deltaTracker);
+                if (!hudHidden() && !(chat && chatHidden())) original.extractRenderState(graphics, deltaTracker);
             });
         }
     }
