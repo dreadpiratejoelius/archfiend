@@ -1,0 +1,4 @@
+[submodule "neu-repo"]
+	path = neu-repo
+	url = https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO.git
+	shallow = true
