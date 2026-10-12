@@ -1,0 +1,23 @@
+{
+	"schemaVersion": 1,
+	"id": "archfiend",
+	"version": "${version}",
+	"name": "Archfiend",
+	"description": "Slot-machine reveal sequence for Hypixel SkyBlock RNG drops.",
+	"authors": [
+		"Archfiend"
+	],
+	"license": "ARR",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.archfiend.ArchfiendClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

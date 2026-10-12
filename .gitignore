@@ -1,0 +1,21 @@
+# Gradle / build output
+.gradle/
+build/
+out/
+
+# Dev client run directory (worlds, configs, logs)
+run/
+logs/
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Third-party mods kept locally for reference (separate git repos)
+reference/
+
+# OS
+.DS_Store
+Thumbs.db
