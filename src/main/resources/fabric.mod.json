@@ -8,6 +8,7 @@
 		"Archfiend"
 	],
 	"license": "ARR",
+	"icon": "assets/archfiend/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [

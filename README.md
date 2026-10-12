@@ -1,3 +1,5 @@
+<img src="src/main/resources/assets/archfiend/icon.png" alt="Archfiend Dice" width="128" align="right">
+
 # Archfiend
 
 A client-side Fabric mod for **Minecraft 26.2** that turns Hypixel SkyBlock RNG drops into a slot-machine reveal.
@@ -74,5 +76,7 @@ Other tasks:
 
 - [NotEnoughUpdates-REPO](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO) for item data and loot tables
 - [Scatha-Pro](https://github.com/NamelessJu/Scatha-Pro) and [SkyOcean](https://github.com/meowdding/SkyOcean) for the original gambling-reel ideas
+
+The icon is the Archfiend Dice item from Hypixel SkyBlock, taken from the [Hypixel SkyBlock Wiki](https://hypixelskyblock.minecraft.wiki/w/Archfiend_Dice).
 
 Not affiliated with Hypixel or Mojang.
