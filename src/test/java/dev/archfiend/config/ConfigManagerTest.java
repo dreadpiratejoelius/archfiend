@@ -65,6 +65,25 @@ class ConfigManagerTest
     }
 
     @Test
+    void migrationAddsNewTriggerToOldConfigsOnce() throws IOException
+    {
+        Path file = dir.resolve("archfiend.json");
+        Files.writeString(file, "{\"triggers\": [{\"prefix\": \"CRAZY RARE DROP!\", \"tier\": \"CRAZY_RARE\"}]}");
+
+        ConfigManager manager = new ConfigManager(file);
+        assertTrue(manager.load());
+        assertEquals(2, manager.get().triggers.size());
+        assertTrue(manager.get().triggers.stream().anyMatch(t -> t.tier() == DropTier.EXTREMELY_RARE));
+
+        // A user who deletes it afterwards must not get it back on the next load.
+        manager.get().triggers.removeIf(t -> t.tier() == DropTier.EXTREMELY_RARE);
+        manager.save();
+        ConfigManager reloaded = new ConfigManager(file);
+        reloaded.load();
+        assertEquals(1, reloaded.get().triggers.size());
+    }
+
+    @Test
     void recoversFromCorruptFile() throws IOException
     {
         Path file = dir.resolve("archfiend.json");

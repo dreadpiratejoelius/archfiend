@@ -7,12 +7,20 @@
 	"authors": [
 		"Archfiend"
 	],
+	"contact": {
+		"homepage": "https://github.com/dreadpiratejoelius/archfiend",
+		"sources": "https://github.com/dreadpiratejoelius/archfiend",
+		"issues": "https://github.com/dreadpiratejoelius/archfiend/issues"
+	},
 	"license": "ARR",
 	"icon": "assets/archfiend/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
 			"dev.archfiend.ArchfiendClient"
+		],
+		"modmenu": [
+			"dev.archfiend.compat.ModMenuIntegration"
 		]
 	},
 	"depends": {
@@ -20,5 +28,8 @@
 		"minecraft": "~${minecraft_version}",
 		"java": ">=25",
 		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
 	}
 }

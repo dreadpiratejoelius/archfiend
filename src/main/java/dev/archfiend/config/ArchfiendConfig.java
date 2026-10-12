@@ -18,6 +18,10 @@ public final class ArchfiendConfig
     public static final int MAX_SPIN_TICKS = 400;
     public static final float MIN_SCALE = 0.25f;
     public static final float MAX_SCALE = 4f;
+    private static final int CURRENT_VERSION = 1;
+
+    /** Schema version for one-off migrations; missing (0) in files written before migrations existed. */
+    public int configVersion = 0;
 
     public boolean enabled = true;
     public SequenceStyle style = SequenceStyle.REEL;
@@ -56,7 +60,10 @@ public final class ArchfiendConfig
         private static final Pattern REPOSITORY = Pattern.compile("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$");
         private static final Pattern BRANCH = Pattern.compile("^[A-Za-z0-9_][A-Za-z0-9_./-]*$");
 
-        public boolean enabled = true;
+        /** Schema version for one-off migrations; missing (0) in files written before migrations existed. */
+    public int configVersion = 0;
+
+    public boolean enabled = true;
         /** Check GitHub for a newer repo commit on startup. */
         public boolean autoUpdate = true;
         /** GitHub {@code owner/name}; point this at a fork if the main repo is unavailable. */
@@ -84,6 +91,7 @@ public final class ArchfiendConfig
         triggers = triggers == null ? new ArrayList<>() : new ArrayList<>(triggers);
         triggers.removeIf(t -> t == null || t.prefix() == null || t.prefix().isBlank() || t.tier() == null);
         if (triggers.isEmpty()) triggers = defaultTriggers();
+        migrate();
 
         if (repo == null) repo = new Repo();
         repo.sanitize();
@@ -93,6 +101,24 @@ public final class ArchfiendConfig
         if (fillers.isEmpty()) fillers = defaultFillers();
     }
 
+    /**
+     * Applies changes to built-in defaults that a saved config would otherwise never pick up.
+     * Each step runs once; user edits made after it are left alone.
+     */
+    private void migrate()
+    {
+        if (configVersion < 1)
+        {
+            addTriggerIfMissing(new Trigger("EXTREMELY RARE DROP!", DropTier.EXTREMELY_RARE));
+        }
+        configVersion = CURRENT_VERSION;
+    }
+
+    private void addTriggerIfMissing(Trigger trigger)
+    {
+        if (triggers.stream().noneMatch(t -> t.prefix().equals(trigger.prefix()))) triggers.add(trigger);
+    }
+
     private static List<Trigger> defaultTriggers()
     {
         return new ArrayList<>(List.of(
@@ -100,6 +126,7 @@ public final class ArchfiendConfig
             new Trigger("VERY RARE DROP!", DropTier.VERY_RARE),
             new Trigger("CRAZY RARE DROP!", DropTier.CRAZY_RARE),
             new Trigger("PET DROP!", DropTier.PET),
+            new Trigger("EXTREMELY RARE DROP!", DropTier.EXTREMELY_RARE),
             new Trigger("INSANE DROP!", DropTier.INSANE),
             new Trigger("PRAY TO RNGESUS DROP!", DropTier.PRAY_TO_RNGESUS),
             new Trigger("PRAY RNGESUS DROP!", DropTier.PRAY_TO_RNGESUS),

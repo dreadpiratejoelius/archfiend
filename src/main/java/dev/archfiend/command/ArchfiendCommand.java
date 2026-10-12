@@ -9,9 +9,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import dev.archfiend.config.ArchfiendConfig;
 import dev.archfiend.config.ConfigManager;
-import dev.archfiend.drop.DropParser;
 import dev.archfiend.drop.DropTier;
-import dev.archfiend.drop.RngDrop;
+import dev.archfiend.drop.TestDrops;
 import dev.archfiend.repo.NeuRepoManager;
 import dev.archfiend.sequence.SequencePlayer;
 import dev.archfiend.sequence.SequenceStyle;
@@ -20,7 +19,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -35,7 +33,6 @@ public final class ArchfiendCommand
 {
     private static final int PREFIX_COLOR = 0xAA00AA;
     private static final int GRAY = 0xAAAAAA;
-    private static final int AQUA = 0x55FFFF;
 
     private static final SuggestionProvider<FabricClientCommandSource> TIER_SUGGESTIONS = (ctx, builder) ->
         SharedSuggestionProvider.suggest(Arrays.stream(DropTier.values()).map(DropTier::commandName), builder);
@@ -45,18 +42,28 @@ public final class ArchfiendCommand
     private final ConfigManager configManager;
     private final SequencePlayer player;
     private final NeuRepoManager repoManager;
+    private final Runnable openSettings;
 
-    public ArchfiendCommand(ConfigManager configManager, SequencePlayer player, NeuRepoManager repoManager)
+    /**
+     * @param openSettings opens the settings screen; must defer to the next tick, because the chat
+     *                     screen closes right after a command runs and would replace it
+     */
+    public ArchfiendCommand(ConfigManager configManager, SequencePlayer player, NeuRepoManager repoManager, Runnable openSettings)
     {
         this.configManager = configManager;
         this.player = player;
         this.repoManager = repoManager;
+        this.openSettings = openSettings;
     }
 
     public void register(CommandDispatcher<FabricClientCommandSource> dispatcher)
     {
         LiteralArgumentBuilder<FabricClientCommandSource> root = literal("archfiend")
             .executes(this::status)
+            .then(literal("config").executes(ctx -> {
+                openSettings.run();
+                return 1;
+            }))
             .then(literal("test")
                 .executes(ctx -> test(ctx, DropTier.CRAZY_RARE, null))
                 .then(argument("tier", StringArgumentType.word()).suggests(TIER_SUGGESTIONS)
@@ -118,21 +125,13 @@ public final class ArchfiendCommand
             c.spinTicks, c.scale, c.volume, c.delayChatMessage, player.queuedCount()
         ));
         feedback(ctx, "NEU repo: " + repoManager.describe());
-        feedback(ctx, "Subcommands: test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, repo [update|loot], reload");
+        feedback(ctx, "Subcommands: config, test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, repo [update|loot], reload");
         return 1;
     }
 
     private int test(CommandContext<FabricClientCommandSource> ctx, DropTier tier, String itemName)
     {
-        String name = itemName != null && !itemName.isBlank() ? itemName.trim() : TestDrops.defaultItem(tier);
-        Component message = TestDrops.message(configManager.get(), tier, name);
-
-        // Round-trip through the real parser so the test exercises the same path as live drops.
-        RngDrop drop = new DropParser(configManager.get().triggers).parse(message)
-            .filter(parsed -> parsed.tier() == tier)
-            .orElseGet(() -> new RngDrop(tier, TestDrops.label(configManager.get(), tier), tier.defaultColor, name, TestDrops.ITEM_COLOR, message));
-
-        if (!player.enqueue(drop, true))
+        if (!player.enqueue(TestDrops.create(configManager.get(), tier, itemName), true))
         {
             ctx.getSource().sendError(Component.literal("Sequence queue is full."));
             return 0;
@@ -199,44 +198,5 @@ public final class ArchfiendCommand
     {
         MutableComponent prefix = Component.literal("[Archfiend] ").withColor(PREFIX_COLOR);
         return prefix.append(Component.literal(text).withColor(GRAY));
-    }
-
-    /** Builds Hypixel-shaped fake drop messages for {@code /archfiend test}. */
-    private static final class TestDrops
-    {
-        static final int ITEM_COLOR = 0xFFAA00;
-
-        static String defaultItem(DropTier tier)
-        {
-            return switch (tier)
-            {
-                case RARE -> "Revenant Viscera";
-                case VERY_RARE -> "Foul Flesh";
-                case CRAZY_RARE -> "Warden Heart";
-                case PET -> "Scatha";
-                case INSANE -> "Overflux Capacitor";
-                case PRAY_TO_RNGESUS -> "Judgement Core";
-                case RNGESUS_INCARNATE -> "Necron's Handle";
-            };
-        }
-
-        static String label(ArchfiendConfig config, DropTier tier)
-        {
-            return config.triggers.stream()
-                .filter(trigger -> trigger.tier() == tier)
-                .map(ArchfiendConfig.Trigger::prefix)
-                .findFirst()
-                .orElse(tier.displayName.toUpperCase() + "!");
-        }
-
-        static Component message(ArchfiendConfig config, DropTier tier, String itemName)
-        {
-            return Component.empty()
-                .append(Component.literal(label(config, tier)).withStyle(Style.EMPTY.withBold(true)).withColor(tier.defaultColor))
-                .append(Component.literal(" (").withColor(GRAY))
-                .append(Component.literal(itemName).withColor(ITEM_COLOR))
-                .append(Component.literal(") ").withColor(GRAY))
-                .append(Component.literal("(+250% ✯ Magic Find)").withColor(AQUA));
-        }
     }
 }

@@ -51,13 +51,10 @@ public final class ConfigManager
             return true;
         }
 
+        ArchfiendConfig loaded;
         try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8))
         {
-            ArchfiendConfig loaded = GSON.fromJson(reader, ArchfiendConfig.class);
-            config = loaded != null ? loaded : new ArchfiendConfig();
-            config.sanitize();
-            save(); // writes back repaired values and any newly added fields
-            return true;
+            loaded = GSON.fromJson(reader, ArchfiendConfig.class);
         }
         catch (IOException | JsonParseException e)
         {
@@ -67,6 +64,12 @@ public final class ConfigManager
             save();
             return false;
         }
+
+        // The reader must be closed before saving: Windows refuses to replace a file with an open handle.
+        config = loaded != null ? loaded : new ArchfiendConfig();
+        config.sanitize();
+        save(); // writes back repaired values and any newly added fields
+        return true;
     }
 
     public void save()

@@ -19,18 +19,23 @@ When a drop like `CRAZY RARE DROP!` or `PET DROP!` appears in chat, the drop mes
 
 ## How it works
 
-1. Chat messages are matched against trigger prefixes (`RARE DROP!`, `VERY RARE DROP!`, `CRAZY RARE DROP!`, `PET DROP!`, `INSANE DROP!`, `PRAY TO RNGESUS DROP!`, `RNGESUS INCARNATE`). Only the start of a message is checked, so player chat can't trigger it.
+1. Chat messages are matched against trigger prefixes (`RARE DROP!`, `VERY RARE DROP!`, `CRAZY RARE DROP!`, `PET DROP!`, `EXTREMELY RARE DROP!`, `INSANE DROP!`, `PRAY TO RNGESUS DROP!`, `RNGESUS INCARNATE`). Only the start of a message is checked, so player chat can't trigger it.
 2. The item name and its rarity colour are read from the message.
 3. Drops at or above `minTier` are queued, and their message is held back until the reveal.
 4. The item and its mob's loot table are looked up in the NEU repo, and the reel is built from that table.
 
 The NEU repo is downloaded on first launch (about 22 MB) to `config/archfiend/neu-repo.zip`. On later launches the cached copy loads instantly, and the mod checks GitHub for a newer commit. If GitHub is unreachable, the cache keeps working.
 
+## Settings
+
+Open the settings menu with `/archfiend config`, the **Open Archfiend Settings** keybind, or the config button in [Mod Menu](https://modrinth.com/mod/modmenu) (optional). Every option has a tooltip, and **Preview** plays a test spin.
+
 ## Commands
 
 | Command | Description |
 |---|---|
 | `/archfiend` | Status |
+| `/archfiend config` | Open the settings menu |
 | `/archfiend test [tier] [item]` | Preview, e.g. `/archfiend test crazy_rare Warden Heart` |
 | `/archfiend style <reel\|slots>` | Switch style |
 | `/archfiend mintier <tier>` | Lowest tier that triggers a spin (default `crazy_rare`) |
@@ -39,13 +44,13 @@ The NEU repo is downloaded on first launch (about 22 MB) to `config/archfiend/ne
 | `/archfiend repo [update\|loot]` | NEU repo status, force update, toggle loot-table reels |
 | `/archfiend reload` | Reload the config |
 
-Tiers: `rare`, `very_rare`, `crazy_rare`, `pet`, `insane`, `pray_to_rngesus`, `rngesus_incarnate`.
+Tiers: `rare`, `very_rare`, `crazy_rare`, `pet`, `extremely_rare`, `insane`, `pray_to_rngesus`, `rngesus_incarnate`.
 
-A **Skip RNG Drop Sequence** keybind is under *Controls → Archfiend* (unbound by default).
+**Skip RNG Drop Sequence** and **Open Archfiend Settings** keybinds are under *Controls → Archfiend* (unbound by default).
 
 ## Configuration
 
-`config/archfiend.json` is created on first launch. Besides the command settings, it holds:
+`config/archfiend.json` is created on first launch. Besides everything in the settings menu, it holds:
 
 - `triggers`: chat prefixes and the tier each one maps to. Edit these if Hypixel changes its wording.
 - `fillers`: fallback symbols for drops with no known loot table.

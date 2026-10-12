@@ -64,6 +64,27 @@ class DropParserTest
     }
 
     @Test
+    void parsesRealSlayerFormatsCapturedBySkyHanni()
+    {
+        RngDrop veryRare = parse("§5§lVERY RARE DROP!  §r§7(§r§f§r§5Revenant Catalyst§r§7) §r§b(+123% ✯ Magic Find)").orElseThrow();
+        assertEquals(DropTier.VERY_RARE, veryRare.tier());
+        assertEquals("Revenant Catalyst", veryRare.itemName());
+        assertEquals(0xAA00AA, veryRare.labelColor());
+
+        RngDrop rare = parse("§b§lRARE DROP! §r§7(§r§f§r§9Revenant Viscera§r§7) §r§b(+50% ✯ Magic Find)").orElseThrow();
+        assertEquals(DropTier.RARE, rare.tier());
+        assertEquals(0x55FFFF, rare.labelColor()); // slayer RARE DROP! is aqua, unlike gold mob drops
+    }
+
+    @Test
+    void parsesExtremelyRareDrop()
+    {
+        RngDrop drop = parse("EXTREMELY RARE DROP! (Scythe Blade)").orElseThrow();
+        assertEquals(DropTier.EXTREMELY_RARE, drop.tier());
+        assertEquals("Scythe Blade", drop.itemName());
+    }
+
+    @Test
     void parsesPetDrop()
     {
         RngDrop drop = parse("§6§lPET DROP! §r§5Scatha §r§b(+250% ✯ Magic Find)").orElseThrow();
