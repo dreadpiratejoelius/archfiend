@@ -53,6 +53,21 @@ public final class ArchfiendCommand
         SharedSuggestionProvider.suggest(Arrays.stream(DropTier.values()).map(DropTier::commandName), builder);
     private static final SuggestionProvider<FabricClientCommandSource> STYLE_SUGGESTIONS = (ctx, builder) ->
         SharedSuggestionProvider.suggest(Arrays.stream(SequenceStyle.values()).map(SequenceStyle::commandName), builder);
+    private static final SuggestionProvider<FabricClientCommandSource> ITEM_SUGGESTIONS = (ctx, builder) -> {
+        try
+        {
+            String rawTier = StringArgumentType.getString(ctx, "tier");
+            Optional<DropTier> tier = DropTier.byCommandName(rawTier);
+            if (tier.isPresent())
+            {
+                return SharedSuggestionProvider.suggest(TestDrops.itemsForTier(tier.get()), builder);
+            }
+        }
+        catch (IllegalArgumentException ignored)
+        {
+        }
+        return SharedSuggestionProvider.suggest(TestDrops.allKnownItems(), builder);
+    };
 
     private final ConfigManager configManager;
     private final SequencePlayer player;
@@ -85,7 +100,7 @@ public final class ArchfiendCommand
                 .executes(ctx -> test(ctx, DropTier.CRAZY_RARE, null))
                 .then(argument("tier", StringArgumentType.word()).suggests(TIER_SUGGESTIONS)
                     .executes(ctx -> withTier(ctx, tier -> test(ctx, tier, null)))
-                    .then(argument("item", StringArgumentType.greedyString())
+                    .then(argument("item", StringArgumentType.greedyString()).suggests(ITEM_SUGGESTIONS)
                         .executes(ctx -> withTier(ctx, tier -> test(ctx, tier, StringArgumentType.getString(ctx, "item")))))))
             .then(literal("skip").executes(ctx -> {
                 player.skip();
