@@ -7,8 +7,10 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -17,86 +19,115 @@ import java.util.random.RandomGenerator;
 /** Weighted bag of filler symbols the reels are populated from. */
 public final class SymbolPool
 {
-    private static final int HISTORY_WEIGHT = 2;
+    private static final double HISTORY_WEIGHT = 2;
     private static final int DEFAULT_COLOR = 0xFFFFFF;
 
     private final List<Symbol> symbols;
-    private final int[] cumulativeWeights;
-    private final int totalWeight;
-    private final Symbol bestTease;
+    private final double[] cumulativeWeights;
+    private final double totalWeight;
+    private final @Nullable Symbol bestTease;
 
-    private SymbolPool(List<Symbol> symbols, List<Integer> weights, Symbol bestTease)
+    private SymbolPool(List<Symbol> symbols, double[] cumulativeWeights, @Nullable Symbol bestTease)
     {
         this.symbols = List.copyOf(symbols);
-        this.cumulativeWeights = new int[weights.size()];
-        int sum = 0;
-        for (int i = 0; i < weights.size(); i++)
-        {
-            sum += weights.get(i);
-            cumulativeWeights[i] = sum;
-        }
-        this.totalWeight = sum;
+        this.cumulativeWeights = cumulativeWeights;
+        this.totalWeight = cumulativeWeights[cumulativeWeights.length - 1];
         this.bestTease = bestTease;
     }
 
+    public static Builder builder()
+    {
+        return new Builder();
+    }
+
     /**
+     * Generic pool from the configured fillers, used when no loot table is known for a drop.
+     *
      * @param history real drops seen earlier this session; they double as believable teases
      */
-    public static SymbolPool build(ArchfiendConfig config, Collection<Symbol> history)
+    public static SymbolPool fromConfig(ArchfiendConfig config, Collection<Symbol> history)
     {
-        List<Symbol> symbols = new ArrayList<>();
-        List<Integer> weights = new ArrayList<>();
-
+        Builder builder = builder();
         for (ArchfiendConfig.Filler filler : config.fillers)
         {
             resolveItem(filler.item()).ifPresentOrElse(
-                item -> {
-                    symbols.add(Symbol.of(item, filler.glint(), filler.name(), parseColor(filler.color())));
-                    weights.add(filler.weight());
-                },
+                item -> builder.add(Symbol.of(item, filler.glint(), filler.name(), parseColor(filler.color())), filler.weight()),
                 () -> ArchfiendClient.LOGGER.warn("Unknown filler item '{}' in config, skipping", filler.item())
             );
         }
 
-        Symbol bestTease = null;
         if (config.teaseSymbols)
         {
             for (DropTier tier : DropTier.values())
             {
                 Symbol tease = Symbol.of(tier.fallbackIcon(), true, tier.displayName, tier.defaultColor);
-                symbols.add(tease);
-                weights.add(tier.isJackpot() ? 1 : 2);
-                bestTease = tease; // tiers iterate in ascending rarity, so the last one is the juiciest
+                builder.add(tease, tier.isJackpot() ? 1 : 2);
+                builder.bestTease(tease); // tiers iterate in ascending rarity, so the last one is the juiciest
             }
-            for (Symbol previous : history)
-            {
-                symbols.add(previous);
-                weights.add(HISTORY_WEIGHT);
-            }
+            for (Symbol previous : history) builder.add(previous, HISTORY_WEIGHT);
         }
 
-        if (symbols.isEmpty())
-        {
-            symbols.add(Symbol.of(Items.COBBLESTONE, false, "Cobblestone", DEFAULT_COLOR));
-            weights.add(1);
-        }
-        return new SymbolPool(symbols, weights, bestTease);
+        if (builder.size() == 0) builder.add(Symbol.of(Items.COBBLESTONE, false, "Cobblestone", DEFAULT_COLOR), 1);
+        return builder.build();
     }
 
     public Symbol next(RandomGenerator random)
     {
-        int roll = random.nextInt(totalWeight);
-        for (int i = 0; i < cumulativeWeights.length; i++)
-        {
-            if (roll < cumulativeWeights[i]) return symbols.get(i);
-        }
-        return symbols.getLast();
+        double roll = random.nextDouble(totalWeight);
+        int index = Arrays.binarySearch(cumulativeWeights, roll);
+        // binarySearch returns (-(insertion point) - 1) on a miss; the insertion point is the bucket.
+        int bucket = index >= 0 ? index + 1 : -index - 1;
+        return symbols.get(Math.min(bucket, symbols.size() - 1));
     }
 
-    /** Highest-tier tease symbol, used for near-miss placement; empty when teases are disabled. */
+    /** Most desirable non-winning symbol, used for near-miss placement; empty when there is none. */
     public Optional<Symbol> bestTease()
     {
         return Optional.ofNullable(bestTease);
+    }
+
+    public static final class Builder
+    {
+        private final List<Symbol> symbols = new ArrayList<>();
+        private final List<Double> weights = new ArrayList<>();
+        private @Nullable Symbol bestTease;
+
+        private Builder() {}
+
+        /** Adds a symbol; non-positive or non-finite weights are ignored. */
+        public Builder add(Symbol symbol, double weight)
+        {
+            if (weight > 0 && Double.isFinite(weight))
+            {
+                symbols.add(symbol);
+                weights.add(weight);
+            }
+            return this;
+        }
+
+        public Builder bestTease(Symbol tease)
+        {
+            this.bestTease = tease;
+            return this;
+        }
+
+        public int size()
+        {
+            return symbols.size();
+        }
+
+        public SymbolPool build()
+        {
+            if (symbols.isEmpty()) throw new IllegalStateException("SymbolPool needs at least one symbol");
+            double[] cumulative = new double[weights.size()];
+            double sum = 0;
+            for (int i = 0; i < cumulative.length; i++)
+            {
+                sum += weights.get(i);
+                cumulative[i] = sum;
+            }
+            return new SymbolPool(symbols, cumulative, bestTease);
+        }
     }
 
     private static Optional<Item> resolveItem(String id)

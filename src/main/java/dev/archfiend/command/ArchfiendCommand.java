@@ -12,9 +12,11 @@ import dev.archfiend.config.ConfigManager;
 import dev.archfiend.drop.DropParser;
 import dev.archfiend.drop.DropTier;
 import dev.archfiend.drop.RngDrop;
+import dev.archfiend.repo.NeuRepoManager;
 import dev.archfiend.sequence.SequencePlayer;
 import dev.archfiend.sequence.SequenceStyle;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.Minecraft;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -42,11 +44,13 @@ public final class ArchfiendCommand
 
     private final ConfigManager configManager;
     private final SequencePlayer player;
+    private final NeuRepoManager repoManager;
 
-    public ArchfiendCommand(ConfigManager configManager, SequencePlayer player)
+    public ArchfiendCommand(ConfigManager configManager, SequencePlayer player, NeuRepoManager repoManager)
     {
         this.configManager = configManager;
         this.player = player;
+        this.repoManager = repoManager;
     }
 
     public void register(CommandDispatcher<FabricClientCommandSource> dispatcher)
@@ -92,6 +96,14 @@ public final class ArchfiendCommand
                         float volume = FloatArgumentType.getFloat(ctx, "volume");
                         return update(ctx, c -> c.volume = volume, c -> "Volume: " + volume);
                     })))
+            .then(literal("repo")
+                .executes(ctx -> {
+                    feedback(ctx, "NEU repo: " + repoManager.describe());
+                    return 1;
+                })
+                .then(literal("update").executes(this::updateRepo))
+                .then(literal("loot").executes(ctx -> update(ctx, c -> c.repo.useLootTables = !c.repo.useLootTables,
+                    c -> "Use mob loot tables for reels: " + c.repo.useLootTables))))
             .then(literal("reload").executes(this::reload));
 
         dispatcher.register(root);
@@ -105,7 +117,8 @@ public final class ArchfiendCommand
             c.enabled ? "enabled" : "disabled", c.style.commandName(), c.minTier.commandName(),
             c.spinTicks, c.scale, c.volume, c.delayChatMessage, player.queuedCount()
         ));
-        feedback(ctx, "Subcommands: test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, reload");
+        feedback(ctx, "NEU repo: " + repoManager.describe());
+        feedback(ctx, "Subcommands: test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, repo [update|loot], reload");
         return 1;
     }
 
@@ -139,10 +152,20 @@ public final class ArchfiendCommand
         return update(ctx, c -> c.style = style.get(), c -> "Style: " + c.style.commandName());
     }
 
+    private int updateRepo(CommandContext<FabricClientCommandSource> ctx)
+    {
+        feedback(ctx, "Updating NEU repo...");
+        FabricClientCommandSource source = ctx.getSource();
+        repoManager.refreshAsync(true).thenRun(() -> Minecraft.getInstance().execute(() ->
+            source.sendFeedback(prefixed("NEU repo: " + repoManager.describe()))));
+        return 1;
+    }
+
     private int reload(CommandContext<FabricClientCommandSource> ctx)
     {
         boolean ok = configManager.load();
         player.reloadParser();
+        repoManager.refreshAsync(false);
         if (ok) feedback(ctx, "Config reloaded.");
         else ctx.getSource().sendError(Component.literal("Config was invalid; defaults restored (old file saved as .corrupt)."));
         return ok ? 1 : 0;
@@ -169,8 +192,13 @@ public final class ArchfiendCommand
 
     private static void feedback(CommandContext<FabricClientCommandSource> ctx, String text)
     {
+        ctx.getSource().sendFeedback(prefixed(text));
+    }
+
+    private static Component prefixed(String text)
+    {
         MutableComponent prefix = Component.literal("[Archfiend] ").withColor(PREFIX_COLOR);
-        ctx.getSource().sendFeedback(prefix.append(Component.literal(text).withColor(GRAY)));
+        return prefix.append(Component.literal(text).withColor(GRAY));
     }
 
     /** Builds Hypixel-shaped fake drop messages for {@code /archfiend test}. */

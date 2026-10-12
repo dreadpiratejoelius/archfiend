@@ -4,13 +4,12 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import dev.archfiend.ArchfiendClient;
+import dev.archfiend.util.AtomicFiles;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -18,8 +17,6 @@ import java.nio.file.StandardCopyOption;
 public final class ConfigManager
 {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-    private static final int REPLACE_ATTEMPTS = 3;
-    private static final long REPLACE_RETRY_DELAY_MS = 20;
 
     private final Path path;
     private ArchfiendConfig config = new ArchfiendConfig();
@@ -72,77 +69,15 @@ public final class ConfigManager
         }
     }
 
-    /**
-     * Writes to a temp file and swaps it in so a crash mid-write can't truncate the config.
-     * On Windows the swap can transiently fail while antivirus or the indexer holds the target open,
-     * so it is retried briefly before falling back to a direct write.
-     */
     public void save()
     {
-        Path temp = path.resolveSibling(path.getFileName() + ".tmp");
         try
         {
-            Files.createDirectories(path.getParent());
-            String json = GSON.toJson(config);
-            Files.writeString(temp, json, StandardCharsets.UTF_8);
-
-            for (int attempt = 1; ; attempt++)
-            {
-                try
-                {
-                    replace(temp, path);
-                    return;
-                }
-                catch (AccessDeniedException e)
-                {
-                    if (attempt >= REPLACE_ATTEMPTS)
-                    {
-                        ArchfiendClient.LOGGER.warn("Config {} is locked, writing it in place", path);
-                        Files.writeString(path, json, StandardCharsets.UTF_8);
-                        return;
-                    }
-                    sleepQuietly(REPLACE_RETRY_DELAY_MS * attempt);
-                }
-            }
+            AtomicFiles.writeString(path, GSON.toJson(config));
         }
         catch (IOException e)
         {
             ArchfiendClient.LOGGER.error("Failed to save config {}", path, e);
-        }
-        finally
-        {
-            try
-            {
-                Files.deleteIfExists(temp);
-            }
-            catch (IOException e)
-            {
-                ArchfiendClient.LOGGER.debug("Could not delete temp config {}", temp, e);
-            }
-        }
-    }
-
-    private static void replace(Path source, Path target) throws IOException
-    {
-        try
-        {
-            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        }
-        catch (AtomicMoveNotSupportedException e)
-        {
-            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-        }
-    }
-
-    private static void sleepQuietly(long millis)
-    {
-        try
-        {
-            Thread.sleep(millis);
-        }
-        catch (InterruptedException e)
-        {
-            Thread.currentThread().interrupt();
         }
     }
 

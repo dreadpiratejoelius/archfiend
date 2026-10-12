@@ -6,6 +6,7 @@ import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Persisted settings. Public mutable fields keep Gson (de)serialisation trivial;
@@ -38,12 +39,38 @@ public final class ArchfiendConfig
 
     /** Chat prefixes that trigger a sequence. Matched against the start of the unformatted message. */
     public List<Trigger> triggers = defaultTriggers();
-    /** Filler symbols that scroll past. {@code item} is a namespaced item id. */
+    /** Filler symbols used when no loot table is known for a drop. {@code item} is a namespaced item id. */
     public List<Filler> fillers = defaultFillers();
+
+    /** NEU item repo: real SkyBlock icons and per-mob loot tables. */
+    public Repo repo = new Repo();
 
     public record Trigger(String prefix, DropTier tier) {}
 
     public record Filler(String item, String name, String color, int weight, boolean glint) {}
+
+    public static final class Repo
+    {
+        public static final String DEFAULT_REPOSITORY = "NotEnoughUpdates/NotEnoughUpdates-REPO";
+        public static final String DEFAULT_BRANCH = "master";
+        private static final Pattern REPOSITORY = Pattern.compile("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$");
+        private static final Pattern BRANCH = Pattern.compile("^[A-Za-z0-9_][A-Za-z0-9_./-]*$");
+
+        public boolean enabled = true;
+        /** Check GitHub for a newer repo commit on startup. */
+        public boolean autoUpdate = true;
+        /** GitHub {@code owner/name}; point this at a fork if the main repo is unavailable. */
+        public String repository = DEFAULT_REPOSITORY;
+        public String branch = DEFAULT_BRANCH;
+        /** Fill the reels with the real loot table of the mob that dropped the item. */
+        public boolean useLootTables = true;
+
+        void sanitize()
+        {
+            if (repository == null || !REPOSITORY.matcher(repository).matches()) repository = DEFAULT_REPOSITORY;
+            if (branch == null || !BRANCH.matcher(branch).matches() || branch.contains("..")) branch = DEFAULT_BRANCH;
+        }
+    }
 
     public void sanitize()
     {
@@ -57,6 +84,9 @@ public final class ArchfiendConfig
         triggers = triggers == null ? new ArrayList<>() : new ArrayList<>(triggers);
         triggers.removeIf(t -> t == null || t.prefix() == null || t.prefix().isBlank() || t.tier() == null);
         if (triggers.isEmpty()) triggers = defaultTriggers();
+
+        if (repo == null) repo = new Repo();
+        repo.sanitize();
 
         fillers = fillers == null ? new ArrayList<>() : new ArrayList<>(fillers);
         fillers.removeIf(f -> f == null || f.item() == null || f.name() == null || f.weight() <= 0);

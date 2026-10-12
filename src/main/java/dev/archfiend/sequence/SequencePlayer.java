@@ -6,6 +6,11 @@ import dev.archfiend.config.ConfigManager;
 import dev.archfiend.drop.DropParser;
 import dev.archfiend.drop.IconResolver;
 import dev.archfiend.drop.RngDrop;
+import dev.archfiend.repo.LootPools;
+import dev.archfiend.repo.NeuItem;
+import dev.archfiend.repo.NeuItemStacks;
+import dev.archfiend.repo.NeuRepo;
+import dev.archfiend.repo.NeuRepoManager;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -32,6 +37,7 @@ public final class SequencePlayer
     private static final int ICON_SCAN_INTERVAL = 5;
 
     private final ConfigManager configManager;
+    private final NeuRepoManager repoManager;
     private final Deque<QueuedDrop> queue = new ArrayDeque<>();
     private final Deque<Symbol> history = new ArrayDeque<>();
     private final SplittableRandom random = new SplittableRandom();
@@ -46,9 +52,10 @@ public final class SequencePlayer
     /** A drop waiting to play; {@code withheld} means its chat message was suppressed and must be re-sent. */
     private record QueuedDrop(RngDrop drop, boolean withheld) {}
 
-    public SequencePlayer(ConfigManager configManager)
+    public SequencePlayer(ConfigManager configManager, NeuRepoManager repoManager)
     {
         this.configManager = configManager;
+        this.repoManager = repoManager;
         reloadParser();
     }
 
@@ -146,18 +153,29 @@ public final class SequencePlayer
         ArchfiendConfig config = configManager.get();
         RngDrop drop = queued.drop();
 
+        Optional<NeuRepo> repo = repoManager.repo();
+        Optional<NeuItem> repoItem = repo.flatMap(r -> r.findByName(drop.itemName(), drop.itemColor()));
+        NeuItemStacks stacks = NeuItemStacks.forClient();
+
+        // The inventory copy is exact (it carries Hypixel's own model); the repo is the next best thing.
         Optional<ItemStack> inventoryIcon = IconResolver.findInInventory(minecraft, drop.itemName());
         iconResolved = inventoryIcon.isPresent();
         ticksSinceIconScan = 0;
         ItemStack icon = inventoryIcon
+            .or(() -> repoItem.flatMap(stacks::create))
             .or(() -> IconResolver.guessVanilla(drop.itemName()))
             .orElseGet(() -> fallbackIcon(drop));
+
+        Optional<SymbolPool> lootPool = config.repo.useLootTables && repo.isPresent() && repoItem.isPresent()
+            ? LootPools.forDrop(repo.get(), stacks, repoItem.get().internalName())
+            : Optional.empty();
+        SymbolPool pool = lootPool.orElseGet(() -> SymbolPool.fromConfig(config, history));
 
         Symbol target = new Symbol(icon, drop.itemComponent(), drop.itemColor());
         SequenceContext context = new SequenceContext(
             drop,
             target,
-            SymbolPool.build(config, history),
+            pool,
             random.split(),
             new SequenceSounds(config.volume),
             config.spinTicks,
