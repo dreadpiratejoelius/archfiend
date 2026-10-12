@@ -115,6 +115,12 @@ final class SlotMachineSequence extends DropSequence
     }
 
     @Override
+    protected float badgeY()
+    {
+        return FRAME_BOTTOM + 12;
+    }
+
+    @Override
     protected void renderMachine(GuiGraphicsExtractor g, Font font, float spinTime, float time, float alpha)
     {
         boolean landed = isRevealed();

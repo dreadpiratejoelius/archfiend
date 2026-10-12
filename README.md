@@ -8,13 +8,17 @@ When a drop like `CRAZY RARE DROP!` or `PET DROP!` appears in chat, the drop mes
 
 ## Features
 
-- **Two styles**
+- **Three styles**
   - `reel`: a horizontal case-opening strip that slows down onto the drop (inspired by [Scatha-Pro](https://github.com/NamelessJu/Scatha-Pro))
   - `slots`: a 3-reel slot machine with a lever and staggered stops (inspired by [SkyOcean](https://github.com/meowdding/SkyOcean))
+  - `chest`: a 3D treasure chest drops in with physics (bounces, wobble, squash and stretch), rattles, then bursts open on a hyperbolic-tangent curve with an exaggerated overshoot. A spinning, glowing question mark floats out, cycling through random rarity colours before slowly settling on the drop's real rarity colour and turning into the item.
 - **Real SkyBlock items:** icons and loot tables come from the [NotEnoughUpdates item repo](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO): textured heads, dyed leather, enchant glint, and Hypixel's own models when their resource pack is loaded.
 - **Real loot tables:** the reels are filled with what the dropping mob can actually drop, weighted by drop chance. For example, a Warden Heart rolls through Revenant Horror V's 16 drops.
 - **Near misses:** the rarest other drop sits right after the winning slot.
 - **Queue:** drops that arrive mid-spin wait their turn (up to 8).
+- **HUD hider:** the hotbar, health, scoreboard, chat and your hand are hidden while a spin plays (toggle in settings).
+- **Drop confirmation:** every announced drop is matched against what actually arrives, in your inventory (by SkyBlock item id) or a sack. The reveal shows where it landed, for example "✔ Inventory" or "→ Combat Sack".
+- **Persistent drop history and stats:** every drop is saved to `config/archfiend/drops.json` with its tier, Magic Find and destination. Past drops also come back as reel teases after a restart.
 - Sounds, reveal banners, a screen flash for top-tier drops, and a skip keybind.
 
 ## How it works
@@ -36,8 +40,11 @@ Open the settings menu with `/archfiend config`, the **Open Archfiend Settings**
 |---|---|
 | `/archfiend` | Status |
 | `/archfiend config` | Open the settings menu |
+| `/archfiend stats` | Lifetime drop counts per tier and most common items |
+| `/archfiend history [n]` | Your last *n* drops with Magic Find and where they landed |
+| `/archfiend log` | Recent item arrivals and how each drop was matched (troubleshooting) |
 | `/archfiend test [tier] [item]` | Preview, e.g. `/archfiend test crazy_rare Warden Heart` |
-| `/archfiend style <reel\|slots>` | Switch style |
+| `/archfiend style <reel\|slots\|chest>` | Switch style |
 | `/archfiend mintier <tier>` | Lowest tier that triggers a spin (default `crazy_rare`) |
 | `/archfiend spin <ticks>` / `scale <x>` / `volume <x>` | Tuning |
 | `/archfiend toggle` / `chatdelay` / `skip` | Enable/disable, hold back the drop message, skip the current spin |
@@ -81,6 +88,8 @@ Other tasks:
 
 - [NotEnoughUpdates-REPO](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO) for item data and loot tables
 - [Scatha-Pro](https://github.com/NamelessJu/Scatha-Pro) and [SkyOcean](https://github.com/meowdding/SkyOcean) for the original gambling-reel ideas
+- [SkyMaxx](https://modrinth.com/mod/skymaxx) (MIT) for showing how to render 3D models in the 26.x GUI
+- "[Minecraft Chest](https://sketchfab.com/3d-models/minecraft-chest-83c5b03288e9416fbe65616e45de2918)" by Blender3D, licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/); the texture is downscaled at load time
 
 The icon is the Archfiend Dice item from Hypixel SkyBlock, taken from the [Hypixel SkyBlock Wiki](https://hypixelskyblock.minecraft.wiki/w/Archfiend_Dice).
 

@@ -3,6 +3,7 @@ package dev.archfiend.drop;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A detected RNG drop.
@@ -12,9 +13,10 @@ import net.minecraft.network.chat.Style;
  * @param labelColor RGB colour of the announcement as sent by the server
  * @param itemName   plain item name, e.g. {@code Warden Heart}
  * @param itemColor  RGB colour of the item name (its SkyBlock rarity colour)
+ * @param magicFind  Magic Find percentage shown in the message, if any
  * @param message    the original chat message, re-sent to chat once the sequence reveals the drop
  */
-public record RngDrop(DropTier tier, String label, int labelColor, String itemName, int itemColor, Component message)
+public record RngDrop(DropTier tier, String label, int labelColor, String itemName, int itemColor, @Nullable Integer magicFind, Component message)
 {
     public MutableComponent labelComponent()
     {

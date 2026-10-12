@@ -12,6 +12,9 @@ import dev.archfiend.config.ConfigManager;
 import dev.archfiend.drop.DropTier;
 import dev.archfiend.drop.TestDrops;
 import dev.archfiend.repo.NeuRepoManager;
+import dev.archfiend.track.DropLog;
+import dev.archfiend.track.DropRecord;
+import dev.archfiend.track.DropTracker;
 import dev.archfiend.sequence.SequencePlayer;
 import dev.archfiend.sequence.SequenceStyle;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -20,7 +23,13 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -33,6 +42,12 @@ public final class ArchfiendCommand
 {
     private static final int PREFIX_COLOR = 0xAA00AA;
     private static final int GRAY = 0xAAAAAA;
+    private static final int DARK_GRAY = 0x555555;
+    private static final int WHITE = 0xFFFFFF;
+    private static final int AQUA = 0x55FFFF;
+    private static final int GREEN = 0x55FF55;
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ROOT).withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault());
 
     private static final SuggestionProvider<FabricClientCommandSource> TIER_SUGGESTIONS = (ctx, builder) ->
         SharedSuggestionProvider.suggest(Arrays.stream(DropTier.values()).map(DropTier::commandName), builder);
@@ -43,13 +58,15 @@ public final class ArchfiendCommand
     private final SequencePlayer player;
     private final NeuRepoManager repoManager;
     private final Runnable openSettings;
+    private final DropTracker tracker;
 
     /**
      * @param openSettings opens the settings screen; must defer to the next tick, because the chat
      *                     screen closes right after a command runs and would replace it
      */
-    public ArchfiendCommand(ConfigManager configManager, SequencePlayer player, NeuRepoManager repoManager, Runnable openSettings)
+    public ArchfiendCommand(ConfigManager configManager, SequencePlayer player, NeuRepoManager repoManager, DropTracker tracker, Runnable openSettings)
     {
+        this.tracker = tracker;
         this.configManager = configManager;
         this.player = player;
         this.repoManager = repoManager;
@@ -111,6 +128,15 @@ public final class ArchfiendCommand
                 .then(literal("update").executes(this::updateRepo))
                 .then(literal("loot").executes(ctx -> update(ctx, c -> c.repo.useLootTables = !c.repo.useLootTables,
                     c -> "Use mob loot tables for reels: " + c.repo.useLootTables))))
+            .then(literal("stats").executes(this::stats))
+            .then(literal("history")
+                .executes(ctx -> history(ctx, 10))
+                .then(argument("count", IntegerArgumentType.integer(1, 50))
+                    .executes(ctx -> history(ctx, IntegerArgumentType.getInteger(ctx, "count")))))
+            .then(literal("log").executes(ctx -> {
+                tracker.describe().forEach(line -> send(ctx, Component.literal(line)));
+                return 1;
+            }))
             .then(literal("reload").executes(this::reload));
 
         dispatcher.register(root);
@@ -125,16 +151,65 @@ public final class ArchfiendCommand
             c.spinTicks, c.scale, c.volume, c.delayChatMessage, player.queuedCount()
         ));
         feedback(ctx, "NEU repo: " + repoManager.describe());
-        feedback(ctx, "Subcommands: config, test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, repo [update|loot], reload");
+        feedback(ctx, "Subcommands: config, stats, history [n], log, test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, repo [update|loot], reload");
         return 1;
     }
 
     private int test(CommandContext<FabricClientCommandSource> ctx, DropTier tier, String itemName)
     {
-        if (!player.enqueue(TestDrops.create(configManager.get(), tier, itemName), true))
+        if (!player.enqueuePreview(TestDrops.create(configManager.get(), tier, itemName)))
         {
             ctx.getSource().sendError(Component.literal("Sequence queue is full."));
             return 0;
+        }
+        return 1;
+    }
+
+    private int stats(CommandContext<FabricClientCommandSource> ctx)
+    {
+        DropLog log = tracker.log();
+        if (log.total() == 0)
+        {
+            feedback(ctx, "No drops recorded yet.");
+            return 1;
+        }
+        feedback(ctx, log.total() + " drops since " + DATE.format(Instant.ofEpochMilli(log.trackingSince())));
+        for (DropTier tier : DropTier.values())
+        {
+            int count = log.count(tier);
+            if (count > 0)
+            {
+                send(ctx, Component.literal("  " + tier.shortName() + ": ").withColor(tier.defaultColor)
+                    .append(Component.literal(String.valueOf(count)).withColor(WHITE)));
+            }
+        }
+        send(ctx, Component.literal("  Most common:").withColor(GRAY));
+        for (Map.Entry<String, Integer> item : log.topItems(5))
+        {
+            send(ctx, Component.literal("    " + item.getValue() + "x " + item.getKey()).withColor(WHITE));
+        }
+        return 1;
+    }
+
+    private int history(CommandContext<FabricClientCommandSource> ctx, int count)
+    {
+        List<DropRecord> recent = tracker.log().recent(count);
+        if (recent.isEmpty())
+        {
+            feedback(ctx, "No drops recorded yet.");
+            return 1;
+        }
+        feedback(ctx, "Last " + recent.size() + " drops:");
+        for (DropRecord record : recent)
+        {
+            MutableComponent line = Component.literal("  " + TIME.format(Instant.ofEpochMilli(record.time)) + " ").withColor(GRAY)
+                .append(Component.literal(record.label + " ").withColor(record.labelColor))
+                .append(Component.literal(record.item).withColor(record.itemColor));
+            if (record.magicFind != null) line.append(Component.literal(" +" + record.magicFind + "% MF").withColor(AQUA));
+            line.append(record.destination != null
+                ? Component.literal(" → " + record.destination).withColor(GREEN)
+                : Component.literal(" (not seen arriving)").withColor(DARK_GRAY));
+            send(ctx, line);
         }
         return 1;
     }
@@ -187,6 +262,11 @@ public final class ArchfiendCommand
         configManager.save();
         feedback(ctx, message.apply(config));
         return 1;
+    }
+
+    private static void send(CommandContext<FabricClientCommandSource> ctx, Component line)
+    {
+        ctx.getSource().sendFeedback(line);
     }
 
     private static void feedback(CommandContext<FabricClientCommandSource> ctx, String text)

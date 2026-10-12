@@ -77,6 +77,12 @@ final class ReelSequence extends DropSequence
     }
 
     @Override
+    protected float badgeY()
+    {
+        return HALF_HEIGHT + 14; // where "Rolling..." sat during the spin
+    }
+
+    @Override
     protected void renderMachine(GuiGraphicsExtractor g, Font font, float spinTime, float time, float alpha)
     {
         float scroll = scroll(spinTime);

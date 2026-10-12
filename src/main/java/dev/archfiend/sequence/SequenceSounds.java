@@ -31,6 +31,39 @@ public record SequenceSounds(float volume)
         play(SoundEvents.VAULT_INSERT_ITEM, 0.6f, 0.6f);
     }
 
+    public void chestThud(float impactSpeed)
+    {
+        float strength = Math.min(1f, impactSpeed / 14f);
+        play(SoundEvents.WOOD_PLACE, 0.55f + 0.25f * (1f - strength), 0.4f + 0.6f * strength);
+        if (strength > 0.6f) play(SoundEvents.NOTE_BLOCK_BASEDRUM, 0.6f, 0.6f * strength);
+    }
+
+    public void chestRattle()
+    {
+        play(SoundEvents.CHEST_LOCKED, 0.9f + (float) Math.random() * 0.3f, 0.5f);
+    }
+
+    public void chestOpen()
+    {
+        play(SoundEvents.CHEST_OPEN, 0.8f, 1f);
+        play(SoundEvents.AMETHYST_BLOCK_RESONATE, 1.2f, 0.7f);
+    }
+
+    public void questionRise()
+    {
+        play(SoundEvents.ENCHANTMENT_TABLE_USE, 1.2f, 0.8f);
+    }
+
+    public void colorTick(float pitch)
+    {
+        play(SoundEvents.AMETHYST_BLOCK_CHIME, pitch, 0.45f);
+    }
+
+    public void colorSettle()
+    {
+        play(SoundEvents.BEACON_POWER_SELECT, 1.3f, 0.5f);
+    }
+
     public void reveal(boolean jackpot)
     {
         if (jackpot)

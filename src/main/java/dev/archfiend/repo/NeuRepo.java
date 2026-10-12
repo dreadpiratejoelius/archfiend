@@ -22,9 +22,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,6 +43,7 @@ public final class NeuRepo
 {
     /** GitHub archives nest everything under {@code <repo>-<ref>/}. */
     private static final Pattern ITEM_ENTRY = Pattern.compile("^[^/]+/items/[^/]+\\.json$");
+    private static final Pattern SACKS_ENTRY = Pattern.compile("^[^/]+/constants/sacks\\.json$");
     private static final long MAX_ENTRY_BYTES = 4L * 1024 * 1024;
 
     private static final Pattern ITEM_MODEL = Pattern.compile("ItemModel:\"([a-z0-9_.-]+:[a-z0-9_./-]+)\"");
@@ -55,12 +58,15 @@ public final class NeuRepo
     private final Map<String, NeuItem> byId;
     private final Map<String, List<NeuItem>> byName;
     private final Map<String, List<DropTable>> tablesByItem;
+    /** Items any sack accepts; empty if the archive had no sack data. */
+    private final Set<String> sackable;
 
-    private NeuRepo(Map<String, NeuItem> byId, Map<String, List<NeuItem>> byName, Map<String, List<DropTable>> tablesByItem)
+    private NeuRepo(Map<String, NeuItem> byId, Map<String, List<NeuItem>> byName, Map<String, List<DropTable>> tablesByItem, Set<String> sackable)
     {
         this.byId = Map.copyOf(byId);
         this.byName = Map.copyOf(byName);
         this.tablesByItem = Map.copyOf(tablesByItem);
+        this.sackable = Set.copyOf(sackable);
     }
 
     public static NeuRepo load(Path archive) throws IOException
@@ -72,7 +78,10 @@ public final class NeuRepo
             while (entries.hasMoreElements())
             {
                 ZipEntry entry = entries.nextElement();
-                if (entry.isDirectory() || !ITEM_ENTRY.matcher(entry.getName()).matches()) continue;
+                if (entry.isDirectory()) continue;
+                boolean item = ITEM_ENTRY.matcher(entry.getName()).matches();
+                boolean sacks = !item && SACKS_ENTRY.matcher(entry.getName()).matches();
+                if (!item && !sacks) continue;
                 if (entry.getSize() > MAX_ENTRY_BYTES)
                 {
                     ArchfiendClient.LOGGER.warn("Skipping oversized repo entry {}", entry.getName());
@@ -81,7 +90,9 @@ public final class NeuRepo
                 try (InputStream in = new BoundedInputStream(zip.getInputStream(entry), MAX_ENTRY_BYTES);
                      Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8))
                 {
-                    builder.accept(JsonParser.parseReader(reader));
+                    JsonElement json = JsonParser.parseReader(reader);
+                    if (item) builder.accept(json);
+                    else builder.acceptSacks(json);
                 }
                 catch (JsonParseException | IllegalStateException | IOException e)
                 {
@@ -131,6 +142,15 @@ public final class NeuRepo
         return tables.stream().max(Comparator.comparingInt(table -> table.entries().size()));
     }
 
+    /**
+     * Whether a sack can hold this item. When the archive has no sack data every item is allowed,
+     * so confirmation degrades to name matching instead of rejecting everything.
+     */
+    public boolean canGoInSack(String internalName)
+    {
+        return sackable.isEmpty() || sackable.contains(internalName);
+    }
+
     /** Parses NEU chance strings such as {@code 0.0136%}, {@code §a5%} or {@code 1/500}. */
     static double parseChance(@Nullable String raw)
     {
@@ -161,6 +181,21 @@ public final class NeuRepo
         private final Map<String, NeuItem> byId = new HashMap<>();
         private final Map<String, List<NeuItem>> byName = new HashMap<>();
         private final Map<String, List<DropTable>> tablesByItem = new HashMap<>();
+        private final Set<String> sackable = new HashSet<>();
+
+        /** {@code {"sacks": {"Combat": {"item": "...", "contents": ["REVENANT_FLESH", ...]}}}} */
+        void acceptSacks(JsonElement element)
+        {
+            if (!(element instanceof JsonObject root) || !(root.get("sacks") instanceof JsonObject sacks)) return;
+            for (Map.Entry<String, JsonElement> sack : sacks.entrySet())
+            {
+                if (!(sack.getValue() instanceof JsonObject definition) || !(definition.get("contents") instanceof JsonArray contents)) continue;
+                for (JsonElement content : contents)
+                {
+                    if (content.isJsonPrimitive()) sackable.add(content.getAsString());
+                }
+            }
+        }
 
         void accept(JsonElement element)
         {
@@ -229,7 +264,7 @@ public final class NeuRepo
         {
             // Deterministic candidate order regardless of zip entry order.
             byName.values().forEach(list -> list.sort(Comparator.comparing(NeuItem::internalName)));
-            return new NeuRepo(byId, byName, tablesByItem);
+            return new NeuRepo(byId, byName, tablesByItem, sackable);
         }
 
         private static @Nullable String string(JsonObject json, String key)

@@ -1,5 +1,7 @@
 package dev.archfiend.sequence;
 
+import dev.archfiend.render3d.ChestAssets;
+
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Function;
@@ -9,7 +11,9 @@ public enum SequenceStyle
     /** Horizontal case-opening reel (Scatha-Pro style). */
     REEL(ReelSequence::new),
     /** Three-reel slot machine with a lever (SkyOcean style). */
-    SLOTS(SlotMachineSequence::new);
+    SLOTS(SlotMachineSequence::new),
+    /** 3D treasure chest that drops in, bursts open and reveals the item. Falls back to the reel if its models fail to load. */
+    CHEST(ctx -> ChestAssets.get().<DropSequence>map(assets -> new ChestSequence(ctx, assets)).orElseGet(() -> new ReelSequence(ctx)));
 
     private final Function<SequenceContext, DropSequence> factory;
 

@@ -36,6 +36,8 @@ public final class ArchfiendConfig
 
     /** Hold the drop chat message back until the sequence reveals it, so chat can't spoil the roll. */
     public boolean delayChatMessage = true;
+    /** Hide the vanilla HUD and first-person hand while a sequence plays. */
+    public boolean hideHud = true;
     /** Mix fake high-tier symbols into the reel for suspense. */
     public boolean teaseSymbols = true;
     /** Put a tease symbol right after the winning slot so the reel "almost" lands on it. */

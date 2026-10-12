@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "dev.archfiend.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"ItemInHandRendererMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

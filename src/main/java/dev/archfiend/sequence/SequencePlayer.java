@@ -11,6 +11,9 @@ import dev.archfiend.repo.NeuItem;
 import dev.archfiend.repo.NeuItemStacks;
 import dev.archfiend.repo.NeuRepo;
 import dev.archfiend.repo.NeuRepoManager;
+import dev.archfiend.track.DropRecord;
+import dev.archfiend.track.DropTracker;
+import dev.archfiend.track.ItemGain;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -20,8 +23,14 @@ import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.SplittableRandom;
 
 /**
@@ -33,29 +42,39 @@ import java.util.SplittableRandom;
 public final class SequencePlayer
 {
     private static final int MAX_QUEUED = 8;
-    private static final int HISTORY_SIZE = 16;
-    private static final int ICON_SCAN_INTERVAL = 5;
+    /** Distinct past drops reused as tease symbols in the generic reel. */
+    private static final int HISTORY_TEASES = 16;
+    private static final int HISTORY_SCAN = 64;
+    private static final int INVENTORY_COLOR = 0x55FF55;
+    private static final int SACK_COLOR = 0x55FFFF;
 
     private final ConfigManager configManager;
     private final NeuRepoManager repoManager;
+    private final DropTracker tracker;
     private final Deque<QueuedDrop> queue = new ArrayDeque<>();
-    private final Deque<Symbol> history = new ArrayDeque<>();
+    /** Real item stacks seen arriving for drops still waiting in the queue. */
+    private final Map<DropRecord, ItemStack> arrivedIcons = new IdentityHashMap<>();
     private final SplittableRandom random = new SplittableRandom();
     private DropParser parser;
 
     private @Nullable DropSequence current;
     private @Nullable QueuedDrop currentDrop;
     private boolean currentReleased;
-    private boolean iconResolved;
-    private int ticksSinceIconScan;
 
-    /** A drop waiting to play; {@code withheld} means its chat message was suppressed and must be re-sent. */
-    private record QueuedDrop(RngDrop drop, boolean withheld) {}
+    /**
+     * A drop waiting to play.
+     *
+     * @param withheld its chat message was suppressed and must be re-sent on reveal
+     * @param record   its persisted record, or {@code null} for previews that must not count as drops
+     */
+    private record QueuedDrop(RngDrop drop, boolean withheld, @Nullable DropRecord record) {}
 
-    public SequencePlayer(ConfigManager configManager, NeuRepoManager repoManager)
+    public SequencePlayer(ConfigManager configManager, NeuRepoManager repoManager, DropTracker tracker)
     {
         this.configManager = configManager;
         this.repoManager = repoManager;
+        this.tracker = tracker;
+        tracker.onConfirmed(this::onConfirmed);
         reloadParser();
     }
 
@@ -65,7 +84,8 @@ public final class SequencePlayer
     }
 
     /**
-     * Fabric {@code ALLOW_GAME} hook.
+     * Fabric {@code ALLOW_GAME} hook. Every recognised drop is recorded; those at or above the
+     * minimum tier also get a sequence.
      *
      * @return {@code false} to suppress the message until the sequence reveals it
      */
@@ -78,25 +98,32 @@ public final class SequencePlayer
         if (parsed.isEmpty()) return true;
 
         RngDrop drop = parsed.get();
-        if (!drop.tier().isAtLeast(config.minTier)) return true;
+        String repoId = repoManager.repo()
+            .flatMap(repo -> repo.findByName(drop.itemName(), drop.itemColor()))
+            .map(NeuItem::internalName)
+            .orElse(null);
+        DropRecord record = tracker.record(drop, repoId);
 
+        if (!drop.tier().isAtLeast(config.minTier)) return true;
         boolean withhold = config.delayChatMessage;
-        if (!enqueue(drop, withhold)) return true;
+        if (!enqueue(drop, withhold, record)) return true;
         return !withhold;
     }
 
-    /**
-     * @param withheld whether the drop's chat message has been suppressed and must be re-sent on reveal
-     * @return {@code false} if the queue is full and the drop was ignored
-     */
-    public boolean enqueue(RngDrop drop, boolean withheld)
+    /** Queues a preview that is not recorded as a real drop. */
+    public boolean enqueuePreview(RngDrop drop)
+    {
+        return enqueue(drop, true, null);
+    }
+
+    private boolean enqueue(RngDrop drop, boolean withheld, @Nullable DropRecord record)
     {
         if (queue.size() >= MAX_QUEUED)
         {
             ArchfiendClient.LOGGER.debug("Sequence queue full, letting '{}' through", drop.itemName());
             return false;
         }
-        queue.addLast(new QueuedDrop(drop, withheld));
+        queue.addLast(new QueuedDrop(drop, withheld, record));
         return true;
     }
 
@@ -109,7 +136,6 @@ public final class SequencePlayer
             start(minecraft, next);
         }
 
-        resolveIcon(minecraft);
         current.tick();
         if (current.isFinished()) finishCurrent();
     }
@@ -124,6 +150,12 @@ public final class SequencePlayer
         return current != null;
     }
 
+    /** Whether the vanilla HUD and hand should be hidden right now. */
+    public boolean hidesHud()
+    {
+        return current != null && configManager.get().hideHud && current.hidesHud();
+    }
+
     public int queuedCount()
     {
         return queue.size();
@@ -135,6 +167,7 @@ public final class SequencePlayer
         if (current != null) releaseCurrent();
         current = null;
         currentDrop = null;
+        arrivedIcons.clear();
         QueuedDrop pending;
         while ((pending = queue.pollFirst()) != null)
         {
@@ -152,16 +185,16 @@ public final class SequencePlayer
     {
         ArchfiendConfig config = configManager.get();
         RngDrop drop = queued.drop();
+        DropRecord record = queued.record();
 
         Optional<NeuRepo> repo = repoManager.repo();
-        Optional<NeuItem> repoItem = repo.flatMap(r -> r.findByName(drop.itemName(), drop.itemColor()));
+        Optional<NeuItem> repoItem = repo.flatMap(r -> findRepoItem(r, record, drop.itemName(), drop.itemColor()));
         NeuItemStacks stacks = NeuItemStacks.forClient();
 
-        // The inventory copy is exact (it carries Hypixel's own model); the repo is the next best thing.
-        Optional<ItemStack> inventoryIcon = IconResolver.findInInventory(minecraft, drop.itemName());
-        iconResolved = inventoryIcon.isPresent();
-        ticksSinceIconScan = 0;
-        ItemStack icon = inventoryIcon
+        // The arrived stack is exact (it carries Hypixel's own model); the repo is the next best thing.
+        ItemStack arrived = record != null ? arrivedIcons.remove(record) : null;
+        ItemStack icon = Optional.ofNullable(arrived)
+            .or(() -> IconResolver.findInInventory(minecraft, drop.itemName()))
             .or(() -> repoItem.flatMap(stacks::create))
             .or(() -> IconResolver.guessVanilla(drop.itemName()))
             .orElseGet(() -> fallbackIcon(drop));
@@ -169,12 +202,11 @@ public final class SequencePlayer
         Optional<SymbolPool> lootPool = config.repo.useLootTables && repo.isPresent() && repoItem.isPresent()
             ? LootPools.forDrop(repo.get(), stacks, repoItem.get().internalName())
             : Optional.empty();
-        SymbolPool pool = lootPool.orElseGet(() -> SymbolPool.fromConfig(config, history));
+        SymbolPool pool = lootPool.orElseGet(() -> SymbolPool.fromConfig(config, historyTeases(repo, stacks)));
 
-        Symbol target = new Symbol(icon, drop.itemComponent(), drop.itemColor());
         SequenceContext context = new SequenceContext(
             drop,
-            target,
+            new Symbol(icon, drop.itemComponent(), drop.itemColor()),
             pool,
             random.split(),
             new SequenceSounds(config.volume),
@@ -182,36 +214,70 @@ public final class SequencePlayer
             config.revealTicks,
             config.scale,
             config.nearMiss,
-            this::onReveal
+            this::releaseCurrent
         );
 
         currentDrop = queued;
         currentReleased = false;
         current = config.style.create(context);
+        if (record != null && record.destination != null) current.setDestination(badge(record.destination));
     }
 
-    /** The real item usually lands in the inventory a moment after the chat message; swap its icon in. */
-    private void resolveIcon(Minecraft minecraft)
+    private void onConfirmed(DropTracker.Confirmation confirmation)
     {
-        if (iconResolved || current == null || currentDrop == null || current.isRevealed()) return;
-        if (++ticksSinceIconScan < ICON_SCAN_INTERVAL) return;
-        ticksSinceIconScan = 0;
+        DropRecord record = confirmation.record();
+        ItemGain gain = confirmation.gain();
 
-        IconResolver.findInInventory(minecraft, currentDrop.drop().itemName()).ifPresent(icon -> {
-            current.setTargetIcon(icon);
-            iconResolved = true;
-        });
-    }
-
-    private void onReveal()
-    {
-        releaseCurrent();
-        // Real drops make for believable teases in later rolls.
-        if (current != null)
+        if (current != null && currentDrop != null && currentDrop.record() == record)
         {
-            history.addFirst(current.targetSymbol());
-            while (history.size() > HISTORY_SIZE) history.removeLast();
+            if (gain.stack() != null) current.setTargetIcon(gain.stack());
+            current.setDestination(badge(gain.destination()));
+            return;
         }
+        if (gain.stack() != null && queue.stream().anyMatch(queued -> queued.record() == record))
+        {
+            arrivedIcons.put(record, gain.stack());
+        }
+    }
+
+    /** Past drops (persisted across sessions) as believable teases for the generic reel. */
+    private List<Symbol> historyTeases(Optional<NeuRepo> repo, NeuItemStacks stacks)
+    {
+        List<Symbol> teases = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (DropRecord past : tracker.log().recent(HISTORY_SCAN))
+        {
+            if (teases.size() >= HISTORY_TEASES) break;
+            if (!seen.add(past.item)) continue;
+
+            ItemStack icon = repo.flatMap(r -> findRepoItem(r, past, past.item, past.itemColor))
+                .flatMap(stacks::create)
+                .orElseGet(() -> {
+                    ItemStack fallback = new ItemStack(past.tier.fallbackIcon());
+                    fallback.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+                    return fallback;
+                });
+            teases.add(new Symbol(icon, Component.literal(past.item).withColor(past.itemColor), past.itemColor));
+        }
+        return teases;
+    }
+
+    /** Prefers the exact SkyBlock id seen on the arrived item over a name lookup. */
+    private static Optional<NeuItem> findRepoItem(NeuRepo repo, @Nullable DropRecord record, String name, int color)
+    {
+        if (record != null && record.skyblockId != null)
+        {
+            Optional<NeuItem> exact = repo.item(record.skyblockId);
+            if (exact.isPresent()) return exact;
+        }
+        return repo.findByName(name, color);
+    }
+
+    private static Component badge(String destination)
+    {
+        return ItemGain.INVENTORY.equals(destination)
+            ? Component.literal("✔ " + destination).withColor(INVENTORY_COLOR)
+            : Component.literal("→ " + destination).withColor(SACK_COLOR);
     }
 
     private static ItemStack fallbackIcon(RngDrop drop)

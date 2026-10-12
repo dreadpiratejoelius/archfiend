@@ -35,7 +35,7 @@ public final class TestDrops
 
         return new DropParser(config.triggers).parse(message)
             .filter(parsed -> parsed.tier() == tier)
-            .orElseGet(() -> new RngDrop(tier, label, tier.defaultColor, name, ITEM_COLOR, message));
+            .orElseGet(() -> new RngDrop(tier, label, tier.defaultColor, name, ITEM_COLOR, 250, message));
     }
 
     public static String defaultItem(DropTier tier)

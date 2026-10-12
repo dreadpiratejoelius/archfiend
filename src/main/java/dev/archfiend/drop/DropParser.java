@@ -2,6 +2,7 @@ package dev.archfiend.drop;
 
 import dev.archfiend.config.ArchfiendConfig.Trigger;
 import net.minecraft.network.chat.Component;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Comparator;
 import java.util.List;
@@ -16,7 +17,7 @@ import java.util.regex.Pattern;
 public final class DropParser
 {
     /** Trailing magic find suffix, e.g. {@code (+312% ✯ Magic Find)}. */
-    private static final Pattern MAGIC_FIND_SUFFIX = Pattern.compile("\\s*\\(\\+[\\d,.]+%\\s*✯?\\s*Magic Find\\)\\s*$");
+    private static final Pattern MAGIC_FIND_SUFFIX = Pattern.compile("\\s*\\(\\+([\\d,.]+)%\\s*✯?\\s*Magic Find\\)\\s*$");
     private static final int MAX_ITEM_NAME_LENGTH = 64;
 
     private final List<Trigger> triggers;
@@ -53,8 +54,13 @@ public final class DropParser
         int itemStart = skipWhitespace(plain, labelEnd);
         int itemEnd = plain.length();
 
+        Integer magicFind = null;
         Matcher suffix = MAGIC_FIND_SUFFIX.matcher(plain);
-        if (suffix.find(itemStart)) itemEnd = suffix.start();
+        if (suffix.find(itemStart))
+        {
+            itemEnd = suffix.start();
+            magicFind = parseMagicFind(suffix.group(1));
+        }
         while (itemEnd > itemStart && Character.isWhitespace(plain.charAt(itemEnd - 1))) itemEnd--;
 
         // Slayer drops wrap the item in parentheses: "VERY RARE DROP! (Foul Flesh)".
@@ -72,7 +78,19 @@ public final class DropParser
         int labelColor = styled.colorAt(labelStart);
         int itemColor = styled.colorAt(itemStart);
 
-        return Optional.of(new RngDrop(trigger.tier(), label, labelColor, itemName, itemColor, message));
+        return Optional.of(new RngDrop(trigger.tier(), label, labelColor, itemName, itemColor, magicFind, message));
+    }
+
+    private static @Nullable Integer parseMagicFind(String raw)
+    {
+        try
+        {
+            return (int) Math.round(Double.parseDouble(raw.replace(",", "")));
+        }
+        catch (NumberFormatException e)
+        {
+            return null;
+        }
     }
 
     private static int skipWhitespace(String s, int from)

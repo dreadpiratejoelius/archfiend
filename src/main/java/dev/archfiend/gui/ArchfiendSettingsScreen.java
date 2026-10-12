@@ -109,6 +109,7 @@ public final class ArchfiendSettingsScreen extends OptionsSubScreen
             bool("tease", c.teaseSymbols, v -> c.teaseSymbols = v),
             bool("near_miss", c.nearMiss, v -> c.nearMiss = v)
         );
+        list.addBig(bool("hide_hud", c.hideHud, v -> c.hideHud = v));
 
         list.addHeader(Component.translatable(KEY + "section.repo"));
         list.addSmall(
@@ -153,7 +154,7 @@ public final class ArchfiendSettingsScreen extends OptionsSubScreen
     {
         DropTier tier = config.minTier;
         minecraft.gui.setScreen(null); // triggers removed(), which saves the settings first
-        player.enqueue(TestDrops.create(config, tier, null), true);
+        player.enqueuePreview(TestDrops.create(config, tier, null));
     }
 
     private void refreshRepoButton()

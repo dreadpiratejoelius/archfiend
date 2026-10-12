@@ -10,6 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Timeline shared by every sequence style: fade in → spin → reveal → fade out.
@@ -27,6 +28,8 @@ public abstract class DropSequence
     private static final float REFERENCE_GUI_WIDTH = 480f;
     private static final float REFERENCE_GUI_HEIGHT = 270f;
     private static final int CELL_BACKGROUND = 0x1C1C24;
+    private static final int BADGE_DELAY_TICKS = 6;
+    private static final int BADGE_FADE_TICKS = 6;
 
     protected final SequenceContext ctx;
     protected final RngDrop drop;
@@ -35,6 +38,7 @@ public abstract class DropSequence
     private Symbol target;
     private int age;
     private boolean revealed;
+    private @Nullable Component destination;
 
     protected DropSequence(SequenceContext ctx, int spinTicks)
     {
@@ -57,6 +61,9 @@ public abstract class DropSequence
 
     /** Virtual Y coordinate (centre of the line) for the tier banner shown on reveal. */
     protected abstract float titleY();
+
+    /** Virtual Y coordinate (centre of the line) for the "where it landed" badge shown on reveal. */
+    protected abstract float badgeY();
 
     public final void tick()
     {
@@ -96,6 +103,18 @@ public abstract class DropSequence
     public final void setTargetIcon(ItemStack icon)
     {
         target = target.withIcon(icon);
+    }
+
+    /** Where the drop actually arrived, e.g. "✔ Inventory"; shown under the machine once revealed. */
+    public final void setDestination(Component destination)
+    {
+        this.destination = destination;
+    }
+
+    /** Whether the vanilla HUD should stay hidden; it returns halfway through the final fade-out. */
+    public final boolean hidesHud()
+    {
+        return age < totalTicks - FADE_OUT_TICKS / 2;
     }
 
     /** The winning symbol, including any icon resolved from the inventory after the sequence started. */
@@ -139,7 +158,15 @@ public abstract class DropSequence
         g.pose().scale(layoutScale);
 
         renderMachine(g, font, Math.min(time, spinTicks), time, alpha);
-        if (time >= spinTicks) renderTitle(g, font, time - spinTicks, alpha);
+        if (time >= spinTicks)
+        {
+            renderTitle(g, font, time - spinTicks, alpha);
+            if (destination != null)
+            {
+                float badgeAlpha = Easing.clamp01((time - spinTicks - BADGE_DELAY_TICKS) / BADGE_FADE_TICKS);
+                Draw.centeredText(g, font, destination, 0f, badgeY(), 1f, alpha * badgeAlpha);
+            }
+        }
 
         g.pose().popMatrix();
 
