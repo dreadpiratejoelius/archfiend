@@ -30,7 +30,6 @@ public abstract class DropSequence
     private static final int FLASH_TICKS = 6;
     private static final float REFERENCE_GUI_WIDTH = 480f;
     private static final float REFERENCE_GUI_HEIGHT = 270f;
-    private static final int CELL_BACKGROUND = 0x1C1C24;
     private static final int BADGE_DELAY_TICKS = 6;
     private static final int BADGE_FADE_TICKS = 6;
 
@@ -232,40 +231,5 @@ public abstract class DropSequence
     protected static float pulse(float time, float speed)
     {
         return 0.5f + 0.5f * Mth.sin(time * speed);
-    }
-
-    /**
-     * Draws a symbol card centred on (cx, cy).
-     *
-     * @param glow 0..1 strength of an outer highlight ring in the symbol's colour
-     */
-    protected static void drawCell(GuiGraphicsExtractor g, Symbol symbol, float cx, float cy, int size, float alpha, float scale, float glow)
-    {
-        if (alpha <= 0.01f) return;
-        int half = size / 2;
-
-        g.pose().pushMatrix();
-        g.pose().translate(cx, cy);
-        g.pose().scale(scale);
-
-        if (glow > 0f)
-        {
-            Draw.border(g, -half - 3, -half - 3, half + 3, half + 3, 2, Draw.argb(alpha * glow, symbol.color()));
-        }
-        g.fill(-half, -half, half, half, Draw.argb(alpha * 0.92f, CELL_BACKGROUND));
-        g.fillGradient(-half, -half, half, 0, Draw.argb(alpha * 0.12f, 0xFFFFFF), Draw.argb(0f, 0xFFFFFF));
-        Draw.border(g, -half, -half, half, half, 1, Draw.argb(alpha * 0.85f, symbol.color()));
-        g.fill(-half + 1, half - 3, half - 1, half - 1, Draw.argb(alpha * 0.9f, symbol.color()));
-
-        // Items can't be alpha-blended, so they pop in once the card is mostly opaque.
-        if (alpha > 0.55f && !symbol.icon().isEmpty())
-        {
-            float iconScale = size * 0.72f / 16f;
-            g.pose().pushMatrix();
-            g.pose().scale(iconScale);
-            g.item(symbol.icon(), -8, -8);
-            g.pose().popMatrix();
-        }
-        g.pose().popMatrix();
     }
 }

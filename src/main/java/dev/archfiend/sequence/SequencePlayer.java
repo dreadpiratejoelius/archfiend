@@ -6,7 +6,6 @@ import dev.archfiend.config.ConfigManager;
 import dev.archfiend.drop.DropParser;
 import dev.archfiend.drop.IconResolver;
 import dev.archfiend.drop.RngDrop;
-import dev.archfiend.repo.LootPools;
 import dev.archfiend.repo.NeuItem;
 import dev.archfiend.repo.NeuItemStacks;
 import dev.archfiend.repo.NeuRepo;
@@ -45,9 +44,6 @@ import java.util.SplittableRandom;
 public final class SequencePlayer
 {
     private static final int MAX_QUEUED = 8;
-    /** Distinct past drops reused as tease symbols in the generic reel. */
-    private static final int HISTORY_TEASES = 16;
-    private static final int HISTORY_SCAN = 64;
     private static final int INVENTORY_COLOR = 0x55FF55;
     private static final int SACK_COLOR = 0x55FFFF;
 
@@ -230,21 +226,14 @@ public final class SequencePlayer
             .or(() -> IconResolver.guessVanilla(drop.itemName()))
             .orElseGet(() -> fallbackIcon(drop));
 
-        Optional<SymbolPool> lootPool = config.repo.useLootTables && repo.isPresent() && repoItem.isPresent()
-            ? LootPools.forDrop(repo.get(), stacks, repoItem.get().internalName())
-            : Optional.empty();
-        SymbolPool pool = lootPool.orElseGet(() -> SymbolPool.fromConfig(config, historyTeases(repo, stacks)));
-
         SequenceContext context = new SequenceContext(
             drop,
             new Symbol(icon, drop.itemComponent(), drop.itemColor()),
-            pool,
             random.split(),
             new SequenceSounds(config.volume),
             config.spinTicks,
             config.revealTicks,
             config.scale,
-            config.nearMiss,
             queued.deathPos(),
             this::releaseCurrent
         );
@@ -270,28 +259,6 @@ public final class SequencePlayer
         {
             arrivedIcons.put(record, gain.stack());
         }
-    }
-
-    /** Past drops (persisted across sessions) as believable teases for the generic reel. */
-    private List<Symbol> historyTeases(Optional<NeuRepo> repo, NeuItemStacks stacks)
-    {
-        List<Symbol> teases = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        for (DropRecord past : tracker.log().recent(HISTORY_SCAN))
-        {
-            if (teases.size() >= HISTORY_TEASES) break;
-            if (!seen.add(past.item)) continue;
-
-            ItemStack icon = repo.flatMap(r -> findRepoItem(r, past, past.item, past.itemColor))
-                .flatMap(stacks::create)
-                .orElseGet(() -> {
-                    ItemStack fallback = new ItemStack(past.tier.fallbackIcon());
-                    fallback.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
-                    return fallback;
-                });
-            teases.add(new Symbol(icon, Component.literal(past.item).withColor(past.itemColor), past.itemColor));
-        }
-        return teases;
     }
 
     /** Prefers the exact SkyBlock id seen on the arrived item over a name lookup. */

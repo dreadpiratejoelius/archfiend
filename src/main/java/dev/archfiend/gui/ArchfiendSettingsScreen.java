@@ -105,10 +105,6 @@ public final class ArchfiendSettingsScreen extends OptionsSubScreen
             slider("volume", 0, 20, Math.round(c.volume / VOLUME_PER_STEP),
                 step -> Math.round(step * VOLUME_PER_STEP * 100) + "%", step -> c.volume = step * VOLUME_PER_STEP)
         );
-        list.addSmall(
-            bool("tease", c.teaseSymbols, v -> c.teaseSymbols = v),
-            bool("near_miss", c.nearMiss, v -> c.nearMiss = v)
-        );
         list.addBig(bool("hide_hud", c.hideHud, v -> c.hideHud = v));
 
         list.addHeader(Component.translatable(KEY + "section.repo"));
@@ -117,7 +113,7 @@ public final class ArchfiendSettingsScreen extends OptionsSubScreen
             bool("repo_auto_update", c.repo.autoUpdate, v -> c.repo.autoUpdate = v)
         );
         repoButton = Button.builder(repoLabel(), button -> repoManager.refreshAsync(true)).build();
-        list.addSmall(bool("loot_tables", c.repo.useLootTables, v -> c.repo.useLootTables = v).createButton(options), repoButton);
+        list.addBig(repoButton);
         refreshRepoButton();
     }
 

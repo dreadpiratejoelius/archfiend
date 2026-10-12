@@ -12,27 +12,6 @@ import net.minecraft.world.level.Level;
 /** UI sounds for a sequence, scaled by the configured master volume. */
 public record SequenceSounds(float volume)
 {
-    public void tick(float pitch)
-    {
-        play(SoundEvents.UI_BUTTON_CLICK, pitch, 0.25f);
-    }
-
-    public void slotTick(float pitch)
-    {
-        play(SoundEvents.NOTE_BLOCK_HAT, pitch, 0.35f);
-    }
-
-    public void reelStop(int reelIndex)
-    {
-        play(SoundEvents.NOTE_BLOCK_BASEDRUM, 0.8f + reelIndex * 0.12f, 0.7f);
-        play(SoundEvents.NOTE_BLOCK_CHIME, 1.0f + reelIndex * 0.25f, 0.35f);
-    }
-
-    public void lever()
-    {
-        play(SoundEvents.VAULT_INSERT_ITEM, 0.6f, 0.6f);
-    }
-
     public void chestThud(float impactSpeed)
     {
         float strength = Math.min(1f, impactSpeed / 14f);

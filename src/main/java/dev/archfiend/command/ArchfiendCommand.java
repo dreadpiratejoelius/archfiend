@@ -125,9 +125,7 @@ public final class ArchfiendCommand
                     feedback(ctx, "NEU repo: " + repoManager.describe());
                     return 1;
                 })
-                .then(literal("update").executes(this::updateRepo))
-                .then(literal("loot").executes(ctx -> update(ctx, c -> c.repo.useLootTables = !c.repo.useLootTables,
-                    c -> "Use mob loot tables for reels: " + c.repo.useLootTables))))
+                .then(literal("update").executes(this::updateRepo)))
             .then(literal("stats").executes(this::stats))
             .then(literal("history")
                 .executes(ctx -> history(ctx, 10))
@@ -151,7 +149,7 @@ public final class ArchfiendCommand
             c.spinTicks, c.scale, c.volume, c.delayChatMessage, player.queuedCount()
         ));
         feedback(ctx, "NEU repo: " + repoManager.describe());
-        feedback(ctx, "Subcommands: config, stats, history [n], log, test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, repo [update|loot], reload");
+        feedback(ctx, "Subcommands: config, stats, history [n], log, test [tier] [item], skip, toggle, chatdelay, style, mintier, spin, scale, volume, repo [update], reload");
         return 1;
     }
 

@@ -24,10 +24,10 @@ public final class ArchfiendConfig
     public int configVersion = 0;
 
     public boolean enabled = true;
-    public SequenceStyle style = SequenceStyle.REEL;
+    public SequenceStyle style = SequenceStyle.CHEST;
     public DropTier minTier = DropTier.CRAZY_RARE;
 
-    /** Ticks the reel(s) spin before landing. Slot machine adds a per-reel stagger on top. */
+    /** Ticks the sequence plays before opening. */
     public int spinTicks = 100;
     /** Ticks the landed result stays on screen before fading out. */
     public int revealTicks = 50;
@@ -38,22 +38,14 @@ public final class ArchfiendConfig
     public boolean delayChatMessage = true;
     /** Hide the vanilla HUD and first-person hand while a sequence plays. */
     public boolean hideHud = true;
-    /** Mix fake high-tier symbols into the reel for suspense. */
-    public boolean teaseSymbols = true;
-    /** Put a tease symbol right after the winning slot so the reel "almost" lands on it. */
-    public boolean nearMiss = true;
 
     /** Chat prefixes that trigger a sequence. Matched against the start of the unformatted message. */
     public List<Trigger> triggers = defaultTriggers();
-    /** Filler symbols used when no loot table is known for a drop. {@code item} is a namespaced item id. */
-    public List<Filler> fillers = defaultFillers();
 
-    /** NEU item repo: real SkyBlock icons and per-mob loot tables. */
+    /** NEU item repo: real SkyBlock icons and item models. */
     public Repo repo = new Repo();
 
     public record Trigger(String prefix, DropTier tier) {}
-
-    public record Filler(String item, String name, String color, int weight, boolean glint) {}
 
     public static final class Repo
     {
@@ -71,8 +63,6 @@ public final class ArchfiendConfig
         /** GitHub {@code owner/name}; point this at a fork if the main repo is unavailable. */
         public String repository = DEFAULT_REPOSITORY;
         public String branch = DEFAULT_BRANCH;
-        /** Fill the reels with the real loot table of the mob that dropped the item. */
-        public boolean useLootTables = true;
 
         void sanitize()
         {
@@ -83,7 +73,7 @@ public final class ArchfiendConfig
 
     public void sanitize()
     {
-        if (style == null) style = SequenceStyle.REEL;
+        if (style == null) style = SequenceStyle.CHEST;
         if (minTier == null) minTier = DropTier.CRAZY_RARE;
         spinTicks = Mth.clamp(spinTicks, MIN_SPIN_TICKS, MAX_SPIN_TICKS);
         revealTicks = Mth.clamp(revealTicks, 10, 200);
@@ -97,10 +87,6 @@ public final class ArchfiendConfig
 
         if (repo == null) repo = new Repo();
         repo.sanitize();
-
-        fillers = fillers == null ? new ArrayList<>() : new ArrayList<>(fillers);
-        fillers.removeIf(f -> f == null || f.item() == null || f.name() == null || f.weight() <= 0);
-        if (fillers.isEmpty()) fillers = defaultFillers();
     }
 
     /**
@@ -133,22 +119,6 @@ public final class ArchfiendConfig
             new Trigger("PRAY TO RNGESUS DROP!", DropTier.PRAY_TO_RNGESUS),
             new Trigger("PRAY RNGESUS DROP!", DropTier.PRAY_TO_RNGESUS),
             new Trigger("RNGESUS INCARNATE", DropTier.RNGESUS_INCARNATE)
-        ));
-    }
-
-    private static List<Filler> defaultFillers()
-    {
-        return new ArrayList<>(List.of(
-            new Filler("minecraft:gold_nugget", "Coins", "#FFAA00", 14, false),
-            new Filler("minecraft:rotten_flesh", "Rotten Flesh", "#FFFFFF", 12, false),
-            new Filler("minecraft:bone", "Bone", "#FFFFFF", 10, false),
-            new Filler("minecraft:string", "String", "#FFFFFF", 10, false),
-            new Filler("minecraft:coal", "Coal", "#FFFFFF", 8, false),
-            new Filler("minecraft:experience_bottle", "Combat XP", "#55FFFF", 8, false),
-            new Filler("minecraft:ender_pearl", "Ender Pearl", "#FFFFFF", 6, false),
-            new Filler("minecraft:rotten_flesh", "Enchanted Rotten Flesh", "#55FF55", 5, true),
-            new Filler("minecraft:ender_pearl", "Enchanted Ender Pearl", "#55FF55", 4, true),
-            new Filler("minecraft:bone", "Enchanted Bone", "#55FF55", 4, true)
         ));
     }
 }

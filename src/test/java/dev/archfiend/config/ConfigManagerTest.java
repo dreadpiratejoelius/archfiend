@@ -36,14 +36,14 @@ class ConfigManagerTest
         Path file = dir.resolve("archfiend.json");
         ConfigManager manager = new ConfigManager(file);
         manager.load();
-        manager.get().style = SequenceStyle.SLOTS;
+        manager.get().style = SequenceStyle.WORLD_CHEST;
         manager.get().minTier = DropTier.INSANE;
         manager.get().spinTicks = 77;
         manager.save();
 
         ConfigManager reloaded = new ConfigManager(file);
         assertTrue(reloaded.load());
-        assertEquals(SequenceStyle.SLOTS, reloaded.get().style);
+        assertEquals(SequenceStyle.WORLD_CHEST, reloaded.get().style);
         assertEquals(DropTier.INSANE, reloaded.get().minTier);
         assertEquals(77, reloaded.get().spinTicks);
     }
@@ -52,16 +52,15 @@ class ConfigManagerTest
     void sanitizesOutOfRangeAndMissingValues() throws IOException
     {
         Path file = dir.resolve("archfiend.json");
-        Files.writeString(file, "{\"spinTicks\": 99999, \"scale\": -3, \"style\": null, \"triggers\": [], \"fillers\": null}");
+        Files.writeString(file, "{\"spinTicks\": 99999, \"scale\": -3, \"style\": null, \"triggers\": []}");
 
         ConfigManager manager = new ConfigManager(file);
         assertTrue(manager.load());
         ArchfiendConfig config = manager.get();
         assertEquals(ArchfiendConfig.MAX_SPIN_TICKS, config.spinTicks);
         assertEquals(ArchfiendConfig.MIN_SCALE, config.scale);
-        assertEquals(SequenceStyle.REEL, config.style);
+        assertEquals(SequenceStyle.CHEST, config.style);
         assertFalse(config.triggers.isEmpty());
-        assertFalse(config.fillers.isEmpty());
     }
 
     @Test

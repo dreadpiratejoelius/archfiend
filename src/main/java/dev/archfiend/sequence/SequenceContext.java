@@ -15,21 +15,19 @@ import java.util.random.RandomGenerator;
 public record SequenceContext(
     RngDrop drop,
     Symbol target,
-    SymbolPool pool,
     RandomGenerator random,
     SequenceSounds sounds,
     int spinTicks,
     int revealTicks,
     float scale,
-    boolean nearMiss,
     @Nullable Vec3 originPos,
     Runnable onReveal
 )
 {
-    public SequenceContext(RngDrop drop, Symbol target, SymbolPool pool, RandomGenerator random,
+    public SequenceContext(RngDrop drop, Symbol target, RandomGenerator random,
                            SequenceSounds sounds, int spinTicks, int revealTicks, float scale,
-                           boolean nearMiss, Runnable onReveal)
+                           Runnable onReveal)
     {
-        this(drop, target, pool, random, sounds, spinTicks, revealTicks, scale, nearMiss, null, onReveal);
+        this(drop, target, random, sounds, spinTicks, revealTicks, scale, null, onReveal);
     }
 }

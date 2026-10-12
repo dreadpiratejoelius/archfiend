@@ -19,3 +19,5 @@ reference/
 # OS
 .DS_Store
 Thumbs.db
+*.blend
+*.blend1

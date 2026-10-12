@@ -3,7 +3,7 @@
 	"id": "archfiend",
 	"version": "${version}",
 	"name": "Archfiend",
-	"description": "Slot-machine reveal sequence for Hypixel SkyBlock RNG drops.",
+	"description": "3D treasure chest reveal sequence for Hypixel SkyBlock RNG drops.",
 	"authors": [
 		"Archfiend"
 	],

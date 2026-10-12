@@ -6,11 +6,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ItemLike;
 
 /**
- * One face on a reel.
+ * Visual representation of an item icon, label, and rarity colour.
  *
- * @param icon  item rendered in the cell
- * @param label name shown when the symbol passes the marker
- * @param color RGB accent used for the cell border and rarity bar
+ * @param icon  item rendered in the reveal
+ * @param label name shown on reveal
+ * @param color RGB accent used for text and rarity glow
  */
 public record Symbol(ItemStack icon, Component label, int color)
 {
