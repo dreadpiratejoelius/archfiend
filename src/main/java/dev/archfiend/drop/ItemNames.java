@@ -13,6 +13,7 @@ public final class ItemNames
     private static final Pattern COUNT_SUFFIX = Pattern.compile("\\s+x[\\d,]+$");
     private static final Pattern RUNE_SYMBOL = Pattern.compile("[◆◇]");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern NON_ID_CHARS = Pattern.compile("[^a-z0-9_]");
 
     private ItemNames() {}
 
@@ -27,5 +28,11 @@ public final class ItemNames
         result = PET_LEVEL_PREFIX.matcher(result).replaceFirst("");
         result = COUNT_SUFFIX.matcher(result).replaceFirst("");
         return result.toLowerCase(Locale.ROOT);
+    }
+
+    /** Resource-path form of a name: {@code Necron's Handle} becomes {@code necrons_handle}. */
+    public static String toId(String name)
+    {
+        return NON_ID_CHARS.matcher(normalize(name).replace(' ', '_')).replaceAll("");
     }
 }

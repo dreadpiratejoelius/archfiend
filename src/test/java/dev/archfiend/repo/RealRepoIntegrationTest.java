@@ -1,5 +1,7 @@
 package dev.archfiend.repo;
 
+import dev.archfiend.drop.DropTier;
+import dev.archfiend.drop.TestDrops;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.Items;
@@ -70,6 +72,20 @@ class RealRepoIntegrationTest
     void scathaPetResolvesByRarityColour()
     {
         assertEquals("SCATHA;4", repo.findByName("Scatha", 0xFFAA00).orElseThrow().internalName());
+    }
+
+    @Test
+    void everyPreviewItemResolvesByName()
+    {
+        List<String> missing = new ArrayList<>();
+        for (DropTier tier : DropTier.values())
+        {
+            for (String name : TestDrops.itemsForTier(tier))
+            {
+                if (repo.findByName(name, tier.defaultColor).isEmpty()) missing.add(name);
+            }
+        }
+        assertTrue(missing.isEmpty(), "preview items missing from repo: " + missing);
     }
 
     private static List<String> allIds()

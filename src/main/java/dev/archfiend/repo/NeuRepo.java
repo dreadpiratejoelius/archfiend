@@ -54,6 +54,9 @@ public final class NeuRepo
     private static final Pattern PERCENT = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*%");
     private static final Pattern ONE_IN = Pattern.compile("1\\s*/\\s*([\\d,]+)");
     private static final double DEFAULT_CHANCE = 1.0;
+    /** Enchantment line in a book's lore, e.g. {@code Smite VII} or {@code Duplex I}. */
+    private static final Pattern ENCHANTMENT_LINE = Pattern.compile("^[A-Za-z][A-Za-z' -]* [IVXL]+$");
+    private static final String ENCHANTED_BOOK = "enchanted book";
 
     private final Map<String, NeuItem> byId;
     private final Map<String, List<NeuItem>> byName;
@@ -227,9 +230,29 @@ public final class NeuRepo
                 ENCHANTED.matcher(nbt).find()
             );
             byId.put(internalName, item);
-            byName.computeIfAbsent(ItemNames.normalize(name), key -> new ArrayList<>()).add(item);
+            index(name, item);
+            // Every book is named "Enchanted Book"; drops and previews name it by its enchantment.
+            String enchantment = ENCHANTED_BOOK.equals(ItemNames.normalize(name)) ? enchantmentName(json) : null;
+            if (enchantment != null) index(enchantment, item);
 
             acceptRecipes(json, name);
+        }
+
+        private void index(String name, NeuItem item)
+        {
+            byName.computeIfAbsent(ItemNames.normalize(name), key -> new ArrayList<>()).add(item);
+        }
+
+        private static @Nullable String enchantmentName(JsonObject json)
+        {
+            if (!(json.get("lore") instanceof JsonArray lore)) return null;
+            for (JsonElement line : lore)
+            {
+                if (!line.isJsonPrimitive()) continue;
+                String plain = ChatFormatting.stripFormatting(line.getAsString());
+                if (plain != null && ENCHANTMENT_LINE.matcher(plain.trim()).matches()) return plain.trim();
+            }
+            return null;
         }
 
         private void acceptRecipes(JsonObject json, String fallbackSource)

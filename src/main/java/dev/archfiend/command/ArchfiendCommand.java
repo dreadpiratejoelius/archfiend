@@ -22,6 +22,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -53,21 +54,11 @@ public final class ArchfiendCommand
         SharedSuggestionProvider.suggest(Arrays.stream(DropTier.values()).map(DropTier::commandName), builder);
     private static final SuggestionProvider<FabricClientCommandSource> STYLE_SUGGESTIONS = (ctx, builder) ->
         SharedSuggestionProvider.suggest(Arrays.stream(SequenceStyle.values()).map(SequenceStyle::commandName), builder);
-    private static final SuggestionProvider<FabricClientCommandSource> ITEM_SUGGESTIONS = (ctx, builder) -> {
-        try
-        {
-            String rawTier = StringArgumentType.getString(ctx, "tier");
-            Optional<DropTier> tier = DropTier.byCommandName(rawTier);
-            if (tier.isPresent())
-            {
-                return SharedSuggestionProvider.suggest(TestDrops.itemsForTier(tier.get()), builder);
-            }
-        }
-        catch (IllegalArgumentException ignored)
-        {
-        }
-        return SharedSuggestionProvider.suggest(TestDrops.allKnownItems(), builder);
-    };
+    /** Suggests nothing for an unknown tier, since the command would reject it anyway. */
+    private static final SuggestionProvider<FabricClientCommandSource> ITEM_SUGGESTIONS = (ctx, builder) ->
+        DropTier.byCommandName(StringArgumentType.getString(ctx, "tier"))
+            .map(tier -> SharedSuggestionProvider.suggest(TestDrops.itemsForTier(tier), builder))
+            .orElseGet(builder::buildFuture);
 
     private final ConfigManager configManager;
     private final SequencePlayer player;
@@ -99,7 +90,7 @@ public final class ArchfiendCommand
             .then(literal("test")
                 .executes(ctx -> test(ctx, DropTier.CRAZY_RARE, null))
                 .then(argument("tier", StringArgumentType.word()).suggests(TIER_SUGGESTIONS)
-                    .executes(ctx -> withTier(ctx, tier -> test(ctx, tier, null)))
+                    .executes(ctx -> withTier(ctx, tier -> test(ctx, tier, TestDrops.randomItem(tier))))
                     .then(argument("item", StringArgumentType.greedyString()).suggests(ITEM_SUGGESTIONS)
                         .executes(ctx -> withTier(ctx, tier -> test(ctx, tier, StringArgumentType.getString(ctx, "item")))))))
             .then(literal("skip").executes(ctx -> {
@@ -168,7 +159,7 @@ public final class ArchfiendCommand
         return 1;
     }
 
-    private int test(CommandContext<FabricClientCommandSource> ctx, DropTier tier, String itemName)
+    private int test(CommandContext<FabricClientCommandSource> ctx, DropTier tier, @Nullable String itemName)
     {
         if (!player.enqueuePreview(TestDrops.create(configManager.get(), tier, itemName)))
         {

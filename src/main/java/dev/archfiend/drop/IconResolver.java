@@ -9,7 +9,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 /**
  * Finds an icon for a dropped item by name. SkyBlock items are custom-named vanilla items
@@ -18,8 +17,6 @@ import java.util.regex.Pattern;
  */
 public final class IconResolver
 {
-    private static final Pattern NON_ID_CHARS = Pattern.compile("[^a-z0-9_]");
-
     private IconResolver() {}
 
     public static Optional<ItemStack> findInInventory(Minecraft minecraft, String itemName)
@@ -44,7 +41,7 @@ public final class IconResolver
 
     public static Optional<ItemStack> guessVanilla(String itemName)
     {
-        String path = NON_ID_CHARS.matcher(ItemNames.normalize(itemName).replace(' ', '_')).replaceAll("");
+        String path = ItemNames.toId(itemName);
         if (path.isEmpty()) return Optional.empty();
 
         return BuiltInRegistries.ITEM.getOptional(Identifier.withDefaultNamespace(path))

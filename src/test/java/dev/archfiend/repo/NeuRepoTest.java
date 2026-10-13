@@ -28,7 +28,7 @@ class NeuRepoTest
     {
         NeuRepo repo = NeuRepo.load(sampleArchive());
 
-        assertEquals(7, repo.itemCount());
+        assertEquals(8, repo.itemCount());
         NeuItem heart = repo.findByName("Warden Heart", 0xFFAA00).orElseThrow();
         assertEquals("WARDEN_HEART", heart.internalName());
         assertEquals(0xFFAA00, heart.nameColor());
@@ -56,6 +56,15 @@ class NeuRepoTest
         assertEquals("SCATHA;3", repo.findByName("Scatha", 0xAA00AA).orElseThrow().internalName());
         // Unknown colour falls back deterministically to the first id.
         assertEquals("SCATHA;3", repo.findByName("[Lvl 100] Scatha", 0x123456).orElseThrow().internalName());
+    }
+
+    @Test
+    void indexesEnchantedBooksByEnchantment() throws IOException
+    {
+        NeuRepo repo = NeuRepo.load(sampleArchive());
+        assertEquals("ULTIMATE_REITERATE;1", repo.findByName("Duplex I", 0).orElseThrow().internalName());
+        assertEquals("ULTIMATE_REITERATE;1", repo.findByName("Enchanted Book", 0).orElseThrow().internalName());
+        assertTrue(repo.findByName("Combinable in Anvil", 0).isEmpty());
     }
 
     @Test
@@ -131,6 +140,8 @@ class NeuRepoTest
             put(zip, ROOT + "items/REVENANT_HORROR_5_BOSS.json", item("REVENANT_HORROR_5_BOSS", "§6Revenant Horror V (Boss)", "minecraft:skull", 3, "", drops));
             put(zip, ROOT + "items/SCATHA;3.json", item("SCATHA;3", "§f§f§7[Lvl {LVL}] §5Scatha", "minecraft:skull", 3, "", ""));
             put(zip, ROOT + "items/SCATHA;4.json", item("SCATHA;4", "§f§f§7[Lvl {LVL}] §6Scatha", "minecraft:skull", 3, "", ""));
+            put(zip, ROOT + "items/ULTIMATE_REITERATE;1.json", item("ULTIMATE_REITERATE;1", "§fEnchanted Book", "minecraft:enchanted_book", 0, "",
+                ",\"lore\":[\"§8Combinable in Anvil\",\"\",\"§d§lDuplex I\",\"§7Shoot a second arrow\",\" §7- Bazaar (§aI-V§7)\"]"));
             put(zip, ROOT + "items/ABYSSAL_BOOTS.json", item("ABYSSAL_BOOTS", "§9Abyssal Boots", "minecraft:leather_boots", 0, bootsNbt, ""));
         }
         return archive;
